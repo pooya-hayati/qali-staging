@@ -1,0 +1,15 @@
+export function isPortrait(base64Image: any): Promise<boolean>;
+export function convertRemToPixels(rem: any): number;
+export function saveImageToLocalStorage(base64Image: any, imageName: any): Promise<void>;
+export function retrieveDataWithImageFromLocalStorage(key: any): any;
+export function getImageOrientation(width: any, height: any): 1 | 2;
+export function vh(percent: any): number;
+export function vw(percent: any): number;
+export function vmin(percent: any): number;
+export function vmax(percent: any): number;
+export function displayHeight(): number;
+export function displayWidth(): number;
+export function setCorrectDemoRoomsTitle(newTitle: any, demoRoomsIds: any, roomId: any, currentTitle: any): any;
+export const IMAGE_PORTRAIT: 1;
+export const IMAGE_LANDSCAPE: 2;
+export function retrieveImageFromLocalStorage(): string | null;

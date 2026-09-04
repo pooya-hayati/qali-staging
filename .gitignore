@@ -1,0 +1,35 @@
+# Credentials / local tooling — never commit
+.vscode/
+.claude/
+wp-config.php
+.env
+*.env
+
+# Generated / non-source WordPress content
+uploads/
+cache/
+logs/
+upgrade/
+upgrade-temp-backup/
+mu-plugins/
+languages/
+node_modules/
+*.log
+debug.log
+
+# Third-party plugins (vendor code, not ours — installed via WordPress.org/commercial licenses)
+modules/akismet/
+modules/awin-advertiser-tracking/
+modules/duracelltomi-google-tag-manager/
+modules/google-listings-and-ads/
+modules/klaviyo/
+modules/microsoft-clarity/
+modules/pinterest-for-woocommerce/
+modules/woocommerce/
+modules/woocommerce-gateway-stripe/
+modules/woocommerce-payments/
+modules/woocommerce-paypal-payments/
+modules/woocommerce-services/
+modules/wordpress-importer/
+modules/wordpress-seo/
+modules/wordpress-seo-premium/

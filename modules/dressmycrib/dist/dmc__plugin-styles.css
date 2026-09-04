@@ -1,0 +1,18 @@
+/* Button styles */
+.cpib-button {
+    position: absolute;
+    bottom: 15px;
+    right: 15px;
+    /* top: 78%; */
+    /* background: #0073aa; */
+    /* color: white; */
+    /* padding: 10px 15px;
+    text-decoration: none;
+    font-size: 14px;
+    border-radius: 4px; */
+    z-index: 1;
+}
+
+/* .cpib-button:hover {
+    background: #005a87;
+} */

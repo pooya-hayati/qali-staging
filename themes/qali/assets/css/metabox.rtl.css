@@ -1,0 +1,259 @@
+/*
+Author: Mohammad Zare
+Author URI: http://mohammadz.com/
+*/
+
+/* autocomplete.css */
+.rwmb-autocomplete-result .label {
+	width: 90%;
+}
+.rwmb-autocomplete-result .actions {
+	float: left;
+}
+/* button-group.css */
+.rwmb-button-input-list.rwmb-inline li label {
+	border-left-width: 1px;
+	border-right-width: 0;
+}
+.rwmb-button-input-list.rwmb-inline li:first-child label {
+	border-left-width: 0;
+	border-right-width: 1px;
+}
+.rwmb-button-input-list.rwmb-inline li label.selected {
+	border-right-color: transparent;
+	border-left-color: rgb(255, 255, 255);
+}
+.rwmb-button-input-list.rwmb-inline li:last-child label.selected {
+	border-right-color: transparent;
+	border-left-color: #0073aa;
+}
+.rwmb-button-input-list.rwmb-inline > li:first-child:not(:last-child) label {
+    border-radius: 0 3px 3px 0;
+}
+.rwmb-button-input-list.rwmb-inline > li:last-child:not(:first-child) label {
+    border-radius: 3px 0 0 3px;
+}
+/* date.css */
+.ui-datepicker .ui-datepicker-prev span {
+	background-position: -32px 0;
+}
+.ui-datepicker .ui-datepicker-next span {
+	background-position: -96px 0;
+}
+.ui-datepicker .ui-datepicker-prev-hover {
+	left: auto;
+	right: 2px;
+}
+.ui-datepicker .ui-datepicker-next-hover {
+	right: auto;
+	left: 2px;
+}
+/* file.css */
+.rwmb-file-icon {
+	margin-right: 0;
+	margin-left: 5px;
+}
+/* image-select.css */
+.rwmb-image-select {
+	float: right;
+	margin: 0 0 10px 10px;
+}
+/* image.css */
+.rwmb-image-wrapper .rwmb-uploaded:not(:empty) {
+	margin: -8px -8px 0 0;
+}
+.rwmb-image-item {
+	float: right;
+}
+.rwmb-image-actions {
+	right: auto;
+	left: 12px;
+}
+/* input-list.css */
+.rwmb-input-list .rwmb-input-list {
+	margin-left: 0;
+	margin-right: 20px;
+}
+.rwmb-input-list.rwmb-inline li:not(:last-child) {
+	margin-right: 0;
+	margin-left: 20px;
+}
+/* input.css */
+.rwmb-input-dark .rwmb-input-group-append {
+	border-radius: 4px 0 0 4px;
+}
+.rwmb-input-dark .rwmb-input-group-prepend {
+	border-radius: 0 4px 4px 0;
+}
+.rwmb-input-dark input {
+	border-right-width: 1px;
+	border-left-width: 1px;
+	border-radius: 0 4px 4px 0;
+}
+.rwmb-input-dark .rwmb-input-group-prepend + input {
+	border-left: 1px;
+	border-right-width: 0;
+	border-radius: 4px 0 0 4px;
+}
+/* media.css */
+.rwmb-media-list:not(:empty) {
+	margin: -8px -8px 0 0;
+}
+.rwmb-media-item.attachment {
+	text-align: right;
+}
+.rwmb-media-preview {
+	float: right;
+}
+.rwmb-media-info {
+	margin-left: 0;
+	margin-right: 65px;
+}
+/* range.css */
+.rwmb-output {
+	margin-left: 0;
+	margin-right: 8px;
+}
+/* slider.css */
+.rwmb-slider-value-label {
+	margin-left: 0;
+	margin-right: 10px;
+}
+/* style.css */
+.rwmb-label,
+.rwmb-input {
+	float: right;
+}
+.rwmb-required {
+	margin-left: 0;
+	margin-right: 3px;
+}
+.rwmb-clone > input[type='radio'],
+.rwmb-clone > input[type='checkbox'] {
+	margin: 6px 4px 0 0;
+}
+.rwmb-button.remove-clone {
+	right: auto;
+	left: 0;
+}
+.rwmb-clone-icon {
+	left: auto;
+	right: 0;
+}
+.rwmb-sort-clone {
+	padding-left: 0;
+	padding-right: 15px;
+}
+/* text-list.css */
+.rwmb-text_list-non-cloneable > .rwmb-input > label,
+.rwmb-text_list-clone > label {
+	margin: 0 0 10px 10px;
+}
+.rwmb-text_list-non-cloneable > .rwmb-input > label:last-child,
+.rwmb-text_list-clone > label:last-child {
+	margin-right: 0;
+	margin-left: 0;
+}
+/* admin-columns.css */
+.mb-admin-columns-image li,
+.mb-admin-columns-image_advanced li,
+.mb-admin-columns-plupload_image li,
+.mb-admin-columns-thickbox_image li,
+.mb-admin-columns-color li {
+	margin: 0 0 5px 5px;
+}
+/* settings.css */
+.nav-tab i,
+.nav-tab img {
+	margin-right: 0;
+	margin-left: 5px;
+}
+.rwmb-settings-tabs-left .nav-tab-active {
+	border-left: none;
+	padding-left: 0;
+	border-right: 4px solid #0073aa;
+	padding-right: 8px;
+}
+/* term-meta.css */
+.rwmb-label {
+	padding: 14px 0 14px 10px;
+}
+@media (max-width: 782px) {
+	.rwmb-input {
+		padding-left: 10px;
+		padding-right: 0;
+	}
+}
+.rwmb-group-wrapper > .rwmb-input:first-of-type {
+	padding-left: 0;
+	padding-right: 220px;
+}
+.rwmb-field:not(.rwmb-group-wrapper) .rwmb-label,
+.rwmb-field:not(.rwmb-group-wrapper) .rwmb-input {
+	float: right;
+}
+#addtag .rwmb-label.required label {
+	float: right;
+}
+/* user-meta.css */
+.rwmb-label {
+	padding: 14px 0 14px 10px;
+}
+@media (max-width: 782px) {
+	.rwmb-input {
+		padding-left: 10px;
+		padding-right: 0;
+	}
+}
+.rwmb-group-wrapper > .rwmb-input:first-of-type {
+	padding-left: 0;
+	padding-right: 220px;
+}
+.rwmb-field:not(.rwmb-group-wrapper) .rwmb-label,
+.rwmb-field:not(.rwmb-group-wrapper) .rwmb-input {
+	float: right;
+}
+/* columns.css */
+  .rwmb-row .rwmb-column {
+    margin-right: 0;
+    margin-left: 5%;
+    float: right;
+  }
+  .rwmb-row .rwmb-column:last-of-type {
+    margin-right: 0;
+    margin-left: 0;
+  }  
+/* group.css */
+.rwmb-clone .rwmb-clone {
+	margin-right: 0;
+	margin-left: 25px;
+}
+.rwmb-group-collapsible > .rwmb-input > .rwmb-clone-placeholder {
+	margin-left: 0;
+}
+.rwmb-group-collapsible > .rwmb-input > .rwmb-group-clone {
+	margin-left: 0;
+}
+.rwmb-group-collapsible > .rwmb-input > .rwmb-group-clone > .rwmb-clone-icon {
+	left: auto;
+	right: 9px;
+}
+.rwmb-group-toggle-handle {
+	right: auto;
+	left: 0;
+}
+.rwmb-group-title-wrapper {
+	left: 32px;
+	right: 0;
+	padding-left: 0;
+	padding-right: 12px;
+}
+.rwmb-clone-icon + .rwmb-group-title-wrapper {
+	padding-left: 0;
+	padding-right: 27px;
+}
+.rwmb-group-remove {
+	margin-left: 0;
+	margin-right: 10px;
+}
+/* tabs.css */

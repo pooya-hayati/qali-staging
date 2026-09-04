@@ -1,0 +1,429 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: Qali\n"
+"POT-Creation-Date: 2023-11-22 20:25+0330\n"
+"PO-Revision-Date: 2023-11-22 20:25+0330\n"
+"Last-Translator: \n"
+"Language-Team: Mohammadz <me@mohammadz.com>\n"
+"Language: fa_IR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
+"X-Generator: Poedit 3.4.1\n"
+"X-Poedit-Basepath: ..\n"
+"X-Poedit-SourceCharset: UTF-8\n"
+"X-Poedit-KeywordsList: __;_e;__ngettext:1,2;_n:1,2;__ngettext_noop:1,2;"
+"_n_noop:1,2;_c;_nc:4c,1,2;_x:1,2c;_nx:4c,1,2;_nx_noop:4c,1,2;_ex:1,2c;"
+"esc_attr__;esc_attr_e;esc_attr_x:1,2c;esc_html__;esc_html_e;"
+"esc_html_x:1,2c\n"
+"X-Poedit-SearchPath-0: .\n"
+"X-Poedit-SearchPathExcluded-0: assets\n"
+"X-Poedit-SearchPathExcluded-1: includes\n"
+"X-Poedit-SearchPathExcluded-2: vendor\n"
+
+#: App/Controller/BreadCrumbs.php:9
+msgid "Home Page"
+msgstr "صفحه اصلی"
+
+#: App/Controller/BreadCrumbs.php:103
+msgid "Author:"
+msgstr "نویسنده:"
+
+#: App/Controller/BreadCrumbs.php:106
+msgid "Page"
+msgstr "صفحه"
+
+#: App/Controller/BreadCrumbs.php:109
+msgid "Search results for:"
+msgstr "نتایج جست‌وجو برای:"
+
+#: App/Controller/BreadCrumbs.php:112 App/Controller/PageTitle.php:38
+#: archive-product.php:31 index.php:21 taxonomy-product_cat.php:24
+#: taxonomy-product_tag.php:17
+msgid "Not Found"
+msgstr "یافت نشد"
+
+#: App/Controller/Contact.php:45
+msgid "Your message has been sent"
+msgstr "پیام شما ارسال شد"
+
+#: App/Controller/MailSender.php:39
+#, php-format
+msgid ""
+"Your Username is : %s and Your password is : %s<br /><a href=\"%s\">Login "
+"Page</a>"
+msgstr ""
+"نام کاربری شما : %s و رمز عبور شما : %s<br /> <a href=\"%s\">صفحه ورود</a>"
+
+#: App/Controller/PageTitle.php:21
+#, php-format
+msgid "Search Results for: %s"
+msgstr "نتایج جست‌وجو برای: %s"
+
+#: App/Controller/PageTitle.php:31
+msgid "Archive"
+msgstr "بایگانی"
+
+#: App/Controller/PageTitle.php:34
+msgid "Tag"
+msgstr "برچسب"
+
+#: App/Controller/Pagination.php:19
+msgid "Prev"
+msgstr "قبلی"
+
+#: App/Controller/Pagination.php:20
+msgid "Next"
+msgstr "بعدی"
+
+#: App/Controller/Shop.php:48 App/PostTypes/PagePost.php:41
+msgid "Home"
+msgstr "خانه"
+
+#: App/Controller/Shop.php:107 App/Controller/Shop.php:108
+#: App/Setup/AppSettings.php:85 templates/mail/mail-main.php:105
+msgid "Address"
+msgstr "آدرس"
+
+#: App/Controller/Shop.php:130 App/PostTypes/BlogPost.php:60
+#: App/PostTypes/PagePost.php:16 App/PostTypes/PagePost.php:368
+#: App/PostTypes/PagePost.php:436 App/PostTypes/PagePost.php:458
+msgid "Options"
+msgstr "تنظیمات"
+
+#: App/Controller/Shop.php:134 single-product.php:56
+msgid "Color"
+msgstr "رنگ"
+
+#: App/PostTypes/PagePost.php:25 App/PostTypes/PagePost.php:46
+msgid "Intro"
+msgstr "اینترو"
+
+#: App/PostTypes/PagePost.php:26 App/PostTypes/PagePost.php:69
+#: App/PostTypes/PagePost.php:88 App/PostTypes/PagePost.php:130
+#: App/PostTypes/PagePost.php:185 single-product.php:107
+msgid "Category"
+msgstr "دسته‌بندی"
+
+#: App/PostTypes/PagePost.php:27 App/PostTypes/PagePost.php:29
+#: App/PostTypes/PagePost.php:105 App/PostTypes/PagePost.php:160
+msgid "Promotion"
+msgstr "پروموشن"
+
+#: App/PostTypes/PagePost.php:28 App/PostTypes/PagePost.php:144
+#: App/PostTypes/PagePost.php:248 App/PostTypes/PagePost.php:281
+msgid "Product"
+msgstr "محصول"
+
+#: App/PostTypes/PagePost.php:30 App/PostTypes/PagePost.php:199
+#: App/PostTypes/PagePost.php:486
+msgid "Feature"
+msgstr "ویژگی"
+
+#: App/PostTypes/PagePost.php:31 App/PostTypes/PagePost.php:32
+#: App/PostTypes/PagePost.php:232 App/PostTypes/PagePost.php:268
+#: templates/card/card-product.php:25
+msgid "Featured"
+msgstr "ویژه"
+
+#: App/PostTypes/PagePost.php:33 App/PostTypes/PagePost.php:301
+msgid "Quote"
+msgstr "نقل قول"
+
+#: App/PostTypes/PagePost.php:34 App/PostTypes/PagePost.php:317
+#: App/PostTypes/PagePost.php:335
+msgid "Video"
+msgstr "ویدئو"
+
+#: App/PostTypes/PagePost.php:35 App/PostTypes/PagePost.php:345
+msgid "Blog"
+msgstr "بلاگ"
+
+#: App/PostTypes/PagePost.php:51 App/PostTypes/PagePost.php:74
+#: App/PostTypes/PagePost.php:110 App/PostTypes/PagePost.php:149
+#: App/PostTypes/PagePost.php:165 App/PostTypes/PagePost.php:350
+msgid "Section Title"
+msgstr "عنوان بخش"
+
+#: App/PostTypes/PagePost.php:58 App/PostTypes/PagePost.php:117
+#: App/PostTypes/PagePost.php:172
+msgid "Section Subtitle"
+msgstr "زیرعنوان بخش"
+
+#: App/PostTypes/PagePost.php:81 App/PostTypes/PagePost.php:204
+#: App/PostTypes/PagePost.php:243 App/PostTypes/PagePost.php:273
+#: App/PostTypes/PagePost.php:491
+msgid "Item"
+msgstr "مورد"
+
+#: App/PostTypes/PagePost.php:124 App/PostTypes/PagePost.php:179
+#: App/PostTypes/PagePost.php:480
+msgid "Cover"
+msgstr "کاور"
+
+#: App/PostTypes/PagePost.php:211 App/PostTypes/PagePost.php:322
+#: App/PostTypes/PagePost.php:405 App/PostTypes/PagePost.php:498
+msgid "Title"
+msgstr "عنوان"
+
+#: App/PostTypes/PagePost.php:218 App/PostTypes/PagePost.php:306
+#: App/PostTypes/PagePost.php:388 App/PostTypes/PagePost.php:418
+msgid "Description"
+msgstr "توضیحات"
+
+#: App/PostTypes/PagePost.php:237 App/PostTypes/PagePost.php:329
+#: App/PostTypes/PagePost.php:412
+msgid "Image"
+msgstr "تصویر"
+
+#: App/PostTypes/PagePost.php:378
+msgid "Contact"
+msgstr "تماس"
+
+#: App/PostTypes/PagePost.php:383 page-contact.php:21
+msgid "Office"
+msgstr "دفتر"
+
+#: App/PostTypes/PagePost.php:398
+msgid "Showroom"
+msgstr "نمایشگاه"
+
+#: App/PostTypes/PagePost.php:446 App/Setup/AppSettings.php:43
+msgid "About"
+msgstr "معرفی"
+
+#: App/PostTypes/PagePost.php:468
+msgid "Shop"
+msgstr "فروشگاه"
+
+#: App/PostTypes/PagePost.php:473 App/PostTypes/PagePost.php:505
+msgid "Subtitle"
+msgstr "زیرعنوان"
+
+#: App/Setup/AppMenu.php:12
+msgid "Primary"
+msgstr "اصلی"
+
+#: App/Setup/AppMenu.php:13
+msgid "Footer"
+msgstr "فوتر"
+
+#: App/Setup/AppMenu.php:14
+msgid "Access"
+msgstr "دسترسی"
+
+#: App/Setup/AppSettings.php:17 App/Setup/AppSettings.php:22
+#: App/Setup/AppSettings.php:197
+msgid "General"
+msgstr "عمومی"
+
+#: App/Setup/AppSettings.php:28
+msgid "Logo"
+msgstr "لوگو"
+
+#: App/Setup/AppSettings.php:33
+msgid "Logomark"
+msgstr "لوگومارک"
+
+#: App/Setup/AppSettings.php:38
+msgid "Logo Footer"
+msgstr "لوگو پاورقی"
+
+#: App/Setup/AppSettings.php:53
+msgid "Copyright"
+msgstr "کپی‌رایت"
+
+#: App/Setup/AppSettings.php:69 App/Setup/AppSettings.php:74
+msgid "Contact Information"
+msgstr "اطلاعات تماس"
+
+#: App/Setup/AppSettings.php:80
+msgid "Manager"
+msgstr "مدیریت"
+
+#: App/Setup/AppSettings.php:91 templates/mail/mail-contact.php:12
+#: templates/mail/mail-main.php:104
+msgid "Phone"
+msgstr "شماره تماس"
+
+#: App/Setup/AppSettings.php:96
+msgid "Postal Code"
+msgstr "کد پستی"
+
+#: App/Setup/AppSettings.php:101
+msgid "Fax"
+msgstr "نمابر"
+
+#: App/Setup/AppSettings.php:106 templates/mail/mail-contact.php:8
+#: templates/mail/mail-main.php:106
+msgid "Email"
+msgstr "ایمیل"
+
+#: App/Setup/AppSettings.php:121 App/Setup/AppSettings.php:126
+#: App/Setup/AppSettings.php:199
+msgid "Social Networks"
+msgstr "شبکه‌های اجتماعی"
+
+#: App/Setup/AppSettings.php:132 templates/footer/footer-main.php:13
+msgid "Instagram"
+msgstr "اینستاگرام"
+
+#: App/Setup/AppSettings.php:137
+msgid "Telegram"
+msgstr "تلگرام"
+
+#: App/Setup/AppSettings.php:142
+msgid "Whatsapp"
+msgstr "واتس‌اپ"
+
+#: App/Setup/AppSettings.php:147
+msgid "Facebook"
+msgstr "فیس‌بوک"
+
+#: App/Setup/AppSettings.php:152
+msgid "Twitter"
+msgstr "توییتر"
+
+#: App/Setup/AppSettings.php:157
+msgid "Pinterest"
+msgstr "پینترست"
+
+#: App/Setup/AppSettings.php:162
+msgid "Linkedin"
+msgstr "لینکدین"
+
+#: App/Setup/AppSettings.php:167
+msgid "Youtube"
+msgstr "یوتیوب"
+
+#: App/Setup/AppSettings.php:192
+msgid "Theme Settings"
+msgstr "تنظیمات پوسته"
+
+#: App/Setup/AppSettings.php:198
+msgid "Contact info"
+msgstr "اطلاعات تماس"
+
+#: Core/Helpers.php:396
+#, php-format
+msgid "%s Hours and %s Minute"
+msgstr "%s ساعت و %s دقیقه"
+
+#: Core/Helpers.php:400
+#, php-format
+msgid "%s Hours and %s Minute and %s Seconds"
+msgstr "%s ساعت و %s دقیقه و %s ثانیه"
+
+#: Core/Helpers.php:428
+#, php-format
+msgid "%s $"
+msgstr "‏%s ﷼"
+
+#: Core/Helpers.php:430
+msgid "Free"
+msgstr "رایگان"
+
+#: Core/Setup.php:69
+msgid "Thumbnail"
+msgstr "بند انگشتی"
+
+#: index.php:6
+msgid "Blog Posts"
+msgstr "مطالب وبلاگ"
+
+#: page-contact.php:29
+msgid "Showrooms"
+msgstr "نمایشگاه‌ها"
+
+#: page-contact.php:53
+msgid "Contact Form"
+msgstr "فرم تماس"
+
+#: page-contact.php:59
+msgid "Your Name"
+msgstr "نام شما"
+
+#: page-contact.php:62
+msgid "Your Email"
+msgstr "ایمیل شما"
+
+#: page-contact.php:65
+msgid "Your Phone"
+msgstr "شماره تماس شما"
+
+#: page-contact.php:68 templates/mail/mail-contact.php:16
+msgid "Subject"
+msgstr "موضوع"
+
+#: page-contact.php:71
+msgid "Your Message"
+msgstr "پیام شما"
+
+#: page-contact.php:74
+msgid "Please Wait…"
+msgstr "لطفا منتظر بمانید…"
+
+#: page-contact.php:74
+msgid "Send Message"
+msgstr "ارسال پیام"
+
+#: page-home.php:167 templates/card/card-product-category.php:14
+msgid "Shop Now"
+msgstr "خرید کنید"
+
+#: page-home.php:202
+msgid "Explore"
+msgstr "مشاهده"
+
+#: page-home.php:303
+msgid "Watch"
+msgstr "مشاهده"
+
+#: single-product.php:68
+msgid "Size"
+msgstr "اندازه"
+
+#: single-product.php:119
+msgid "Tags"
+msgstr "برچسب‌ها"
+
+#: single-product.php:156
+msgid "Related Products"
+msgstr "محصولات مرتبط"
+
+#: templates/card/card-blog.php:13
+msgid "ago"
+msgstr "قبل"
+
+#: templates/card/card-product.php:22
+msgid "Sale"
+msgstr "حراج"
+
+#: templates/card/card-product.php:28
+msgid "Sold Out"
+msgstr "تمام شده"
+
+#: templates/header/header-main.php:31
+msgid "Close"
+msgstr "بستن"
+
+#: templates/header/header-main.php:32
+msgid "Menu"
+msgstr "فهرست"
+
+#: templates/header/header-main.php:33
+msgid "Cart"
+msgstr "سبد خرید"
+
+#: templates/header/header-main.php:34
+msgid "Account"
+msgstr "حساب کاربری"
+
+#: templates/mail/mail-contact.php:4
+msgid "Name"
+msgstr "نام"
+
+#: templates/mail/mail-contact.php:20
+msgid "Message"
+msgstr "پیام"
