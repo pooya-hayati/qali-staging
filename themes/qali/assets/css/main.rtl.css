@@ -703,15 +703,16 @@ body.nav-open .user-nav > li.nav-toggle > button:nth-child(1) {
   padding: 20px 0 0;
 }
 .product-card-title {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 500;
   line-height: normal;
   letter-spacing: 0em;
   color: #0d0d0c;
   margin: 0;
 }
+.product-card-price,
 .product-card-size {
-  font-size: 24px;
+  font-size: 18px;
   font-weight: normal;
   line-height: normal;
   letter-spacing: 0em;
@@ -977,7 +978,7 @@ body.nav-open .user-nav > li.nav-toggle > button:nth-child(1) {
   align-items: center;
   gap: 16px;
   max-width: 400px;
-  margin: 48px auto 0;
+  margin: 150px auto 0;
   text-align: center;
 }
 .show-more-progress-text {
@@ -1020,8 +1021,8 @@ body.nav-open .user-nav > li.nav-toggle > button:nth-child(1) {
   background-image: none;
 }
 .show-more-btn.button-fill-primary:hover {
-  background-color: #5c0000;
-  border-color: #5c0000;
+  background-color: #ac1f1f;
+  border-color: #ac1f1f;
   color: #fff;
 }
 .show-more-btn.is-loading {

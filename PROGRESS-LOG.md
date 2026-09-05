@@ -397,3 +397,35 @@ The deep-link hydration logic (`shop.js`, fetches pages `1..current-1` in parall
 - Zero new console/`pageerror` events across all pages tested. `debug.log` size/mtime unchanged (387,084,368 bytes, 2026-08-24 23:28:08).
 
 Deployed via SFTP (paramiko): `App/Controller/Shop.php`, `assets/js/shop.js`. `templates/shop/product-grid.php` was not touched — already fully dynamic.
+
+---
+
+## 22. Investigated a reported "3 CSS changes not live" bug — root cause: the changes had never actually been made
+
+The user reported that 3 specific CSS values (`.show-more-btn.button-fill-primary:hover` → `#ac1f1f`, `.show-more-wrap` margin-top → `150px`, `.product-card-title`/`.product-card-price`/`.product-card-size` font-size → `18px`) were "not live" despite being part of "the last 3 CSS-only changes," and asked for a deploy-vs-cache root cause investigation before any fix.
+
+**Investigated before touching anything, per the task's explicit instruction not to blindly re-apply:**
+- **Local source** (`main.css`): none of the 3 values were present — `.show-more-wrap` was `margin: 48px auto 0`, the hover was `#5c0000`, title was `20px`, price/size were `24px`.
+- **Full git history** (`git log --all -p`, all branches, reflog — this repo has only `main`, no other branches or dangling commits): searched every commit ever made to `main.css` for `150px`, `ac1f1f`, and `18px`. None appear anywhere, ever. The only related history is commit `6f0e0a2` (#15 in this log), which *deliberately* set the hover to `#5c0000` and explicitly moved it *away* from `#ac1f1f`/`--color-Thunderbird` (documented reasoning: avoid the shared class's white-slide hover animation inverting the button to white/red text).
+- **Live CSS**, fetched from the exact URL the page's own `<link rel="stylesheet">` tag references: byte-identical to local source on all 3 rules — same `48px`, `#5c0000`, `20px`/`24px`.
+- **Cache-busting mechanism**: `main.css` is enqueued (`Core/Enqueue.php` + `App/Setup/AppEnqueue.php`) with `?version=<THEME_VERSION>`, and `THEME_VERSION` (`App/Define.php:6`) is `define('THEME_VERSION', date('YmdHis'))` — recomputed fresh on *every single page request*, not tied to a file mtime or a manually-bumped number. That query string can never go stale, which independently rules out the "unchanged `?ver=` behind a cache" theory the task suggested as a leading candidate. No caching plugin, page cache, object cache, or CDN was found in the enqueue path either.
+
+**Conclusion reported back to the user, before any code change:** this was not a deploy failure, cache problem, or path mismatch — none of my last several commits (`ac7c13b`, `831747f`, `d5daf41`) touched `.show-more-btn`, `.show-more-wrap`, `.product-card-title`, or `.product-card-price`/`.product-card-size` at all (only `.product-card-wishlist-badge`, `.product-card-img`/`.product-card-img-second`, `.product-card-tint`, and PHP/JS pagination logic). The 3 values simply didn't exist in the codebase's history, locally, or on the server, at any point. Asked the user how to proceed rather than guessing; they confirmed they wanted these implemented now as new changes (not a bug fix) — including reverting the Show More hover color back to the `#ac1f1f`/Thunderbird value #15 had deliberately moved away from.
+
+**Applied as new changes** in `main.css`/`main.rtl.css`:
+- `.show-more-btn.button-fill-primary:hover` background/border-color: `#5c0000` → `#ac1f1f`.
+- `.show-more-wrap` margin: `48px auto 0` → `150px auto 0`.
+- `.product-card-title` font-size: `20px` → `18px`; `.product-card-price`/`.product-card-size` font-size: `24px` → `18px`.
+- While touching this in `main.rtl.css`: found `.product-card-price` was missing from that file's selector group entirely (only `.product-card-size` was present — another instance of the main.css/main.rtl.css drift noted in earlier entries) — added it there too, grouped the same way `main.css` does, so RTL visitors actually get the price font-size change instead of it silently no-opping.
+- Noted, not fixed (out of scope): `.product-card-size` isn't emitted by any current template (`grep` across `templates/` found no usage) — the CSS rule is correctly updated but currently unverifiable live since nothing renders that class. Pre-existing, unrelated to this change.
+
+**Verified live**, using the same methods the task specified:
+- Curled the live CSS URL directly post-deploy (`https://dev.qali.art/app/themes/qali/assets/css/main.css?version=<fresh-timestamp>`) and grepped all 3 rules — confirmed present in what's actually served.
+- Playwright, fresh page load + explicit reload (not relying on any cache): `getComputedStyle` confirmed `.product-card-title` and `.product-card-price` both `18px`, `.show-more-wrap` `margin-top: 150px`.
+- Show More hover color: first read at 300ms post-hover returned `rgb(171, 30, 31)` — one unit off from `#ac1f1f`'s exact `rgb(172, 31, 31)` in each channel. Traced this rather than accepting a "close enough" read: `.button:not(.button-link) { transition: .4s, background-position 0s; }` (the shared slide-hover mechanism) transitions **all** animatable properties over 0.4s, including `background-color` — the button was still mid-transition at 300ms. Re-checked at 800ms (past the transition): exact `rgb(172, 31, 31)`.
+- Screenshots at 1440px confirm all three changes visually: smaller card title/price text, a visibly larger gap above the "Show More" progress bar, and a lighter-red button on hover vs. its `#780000` rest state.
+- Zero new console/`pageerror` events. `debug.log` size/mtime unchanged (387,084,368 bytes, 2026-08-24 23:28:08).
+
+**Why this is worth a dedicated log entry beyond the fix itself:** to make this class of report easier to triage immediately next time. The fast, cheap first check for "a described change isn't live" is: `git log --all -p -- <file> | grep <the specific old/new value>` — if the value never appears in history at all, that's a much stronger and faster signal than checking deploy logs or cache headers, and rules out an entire category of causes (deploy failure, path mismatch, stale cache) in one command before spending time on the SFTP/cache investigation this task otherwise walks through.
+
+Deployed via SFTP (paramiko): `assets/css/main.css`, `assets/css/main.rtl.css` only.

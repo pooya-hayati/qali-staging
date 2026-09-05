@@ -930,7 +930,7 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
 }
 
 .product-card-title {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 500;
   line-height: normal;
   letter-spacing: 0px;
@@ -954,7 +954,7 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
 
 .product-card-price,
 .product-card-size {
-  font-size: 24px;
+  font-size: 18px;
   font-weight: normal;
   line-height: normal;
   letter-spacing: 0px;
@@ -1395,7 +1395,7 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
   align-items: center;
   gap: 16px;
   max-width: 400px;
-  margin: 48px auto 0;
+  margin: 150px auto 0;
   text-align: center;
 }
 
@@ -1443,8 +1443,8 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
 }
 
 .show-more-btn.button-fill-primary:hover {
-  background-color: #5c0000;
-  border-color: #5c0000;
+  background-color: #ac1f1f;
+  border-color: #ac1f1f;
   color: var(--color-White);
 }
 
