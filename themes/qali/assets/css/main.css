@@ -799,11 +799,25 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
   position: relative;
 }
 
-.product-card-img {
+.product-card-img,
+.product-card-img-second {
   width: 100%;
   height: 100%;
   object-fit: contain;
   display: block;
+}
+
+/* Second gallery image, stacked absolutely over the first for a hover
+   crossfade. Only `opacity` transitions — the first image's opacity never
+   changes, it just sits underneath the whole time — so there is no
+   flicker/stacking artifact and no display:none/block toggling. Only
+   rendered in the DOM at all when the product has a 2nd gallery image
+   (see card-product.php), so products with 0/1 images are unaffected. */
+.product-card-img-second {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity .3s ease;
 }
 
 /* Hover feedback: a flat white tint (not filter: brightness — tested both
@@ -812,7 +826,8 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
    of the photo's own tone) plus a wishlist heart badge, top-right of the
    image. Both gated to real hover so touch devices never get a "stuck"
    hover state; the heart is made always-visible for touch separately,
-   below.  */
+   below. The tint sits above both images in DOM order, so it lights
+   whichever one is currently visible during the crossfade. */
 .product-card-tint {
   position: absolute;
   inset: 0;
@@ -824,13 +839,22 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
 /* Wrapper carries the circular badge background; .wishlist-button's own
    `filter` (recolors its black SVG heart to CarpetRed) applies to the
    *whole element it's set on*, so the white badge background has to live
-   on an unfiltered ancestor, not on .wishlist-button itself. */
+   on an unfiltered ancestor, not on .wishlist-button itself.
+
+   The icon itself is overridden here (not in the shared .wishlist-button
+   rule further down, which stays untouched for its other usages in
+   .product-card-meta / single-product.php) with a plain line-art heart
+   outline / solid heart fill, instead of the shared class's heart-plus /
+   heart-check glyphs — sized/spaced up from the original 34px badge @
+   10px inset / 55% icon (tested 36/40/44px badges live before picking
+   40px @ 14px inset / 60% icon as the clearest read without feeling
+   oversized). */
 .product-card-wishlist-badge {
   position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 34px;
-  height: 34px;
+  top: 14px;
+  right: 14px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   background-color: rgba(255, 255, 255, .85);
   display: flex;
@@ -844,7 +868,12 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
 .product-card-wishlist-badge .wishlist-button {
   width: 100%;
   height: 100%;
-  background-size: 55%;
+  background-size: 60%;
+  background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>');
+}
+
+.product-card-wishlist-badge .wishlist-button.active {
+  background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="black"><path d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"/></svg>');
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -853,6 +882,10 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
   }
 
   .product-card-header:hover .product-card-wishlist-badge {
+    opacity: 1;
+  }
+
+  .product-card-header:hover .product-card-img-second {
     opacity: 1;
   }
 }

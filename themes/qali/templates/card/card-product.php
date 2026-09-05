@@ -33,6 +33,8 @@ $user_id      = get_current_user_id();
 $wishlist     = $user_id ? get_user_meta($user_id, '_user_wishlist', true) : [];
 $wishlist     = is_array($wishlist) ? $wishlist : [];
 $is_wished    = in_array($post_id, $wishlist, true);
+$gallery_ids  = $product->get_gallery_image_ids();
+$second_id    = ! empty($gallery_ids) ? absint($gallery_ids[0]) : 0;
 ?>
 <article class="product-card" data-animate="fadeInUp" itemscope itemtype="https://schema.org/Product">
 	<div class="product-card-header">
@@ -51,6 +53,15 @@ $is_wished    = in_array($post_id, $wishlist, true);
 					class="product-card-img"
 					itemprop="image"
 					loading="lazy">
+			<?php endif; ?>
+
+			<?php if ($second_id) : ?>
+				<?php echo wp_get_attachment_image($second_id, 'qali-product-card-2x', false, [
+					'class'       => 'product-card-img-second',
+					'loading'     => 'lazy',
+					'alt'         => '',
+					'aria-hidden' => 'true',
+				]); ?>
 			<?php endif; ?>
 
 			<span class="product-card-tint" aria-hidden="true"></span>
