@@ -457,3 +457,19 @@ Rollback point: tag `pre-chained-filters` on commit `6654da4`, pushed to origin,
 **Flagging for explicit confirmation, not silently finalized:** the alphabetical-order canonical URL (an addition beyond the literal spec, to prevent N! duplicate-content variants of the same chain). The noindex floor was flagged the same way and has since been confirmed/changed by the user (`8` → `2`, see above).
 
 Deployed via SFTP (paramiko): `App/Controller/Shop.php`, `assets/js/shop.js`, `templates/header/header-shop.php`, `templates/shop/product-grid.php`. Rewrite rules flushed once on the live site after deploying.
+
+## 24. Extended the category H1/description feature (§5) to all 8 product-attribute taxonomies
+
+A follow-up requested earlier (the attribute-page H1 the §23 chaining plan referenced, `Shop::chain_title_text()`, only ever covered chained pages — a plain single-attribute page like `/origin/senneh/` still had no on-page H1 or description at all) but not built until now. Extends `templates/header/header-shop.php`'s existing `is_tax('product_cat')` H1/description block (§5) to also cover `pa_color`/`pa_design`/`pa_feel`/`pa_material`/`pa_origin`/`pa_shape`/`pa_size`/`pa_thickness`, single-attribute and chained alike — `product_cat`'s own branch is untouched.
+
+**Key difference from the `product_cat` case, by design:** these 8 taxonomies' terms already have real, unique per-term descriptions filled in via wp-admin's native "Description" field on the Edit Term screen — the exact field `term_description()` and Yoast's default `og:description` already read (confirmed live before writing any code: `/origin/tabriz/` and `/origin/senneh/` both had full paragraphs there, just never surfaced on the page itself). So no second `seo_description`-style Meta Box field was added for these — the new code calls `term_description($term->term_id, $term->taxonomy)` directly (the filtered version, so `wpautop` still turns the plain-text field's line breaks into real `<p>` tags, matching how the `product_cat` wysiwyg-field description already renders).
+
+**Precedence in `header-shop.php`** (single `if / elseif` chain, so exactly one branch ever renders): `product_cat` (existing, untouched) → chained attribute URL (`Shop::chain_title_text()`, existing — H1 only, still combines every active segment's name in URL order, unchanged) → single (non-chained) attribute archive (new — H1 is the term's own name, e.g. "Senneh", plus its description if non-empty). The single-attribute branch is explicitly gated on `$chain_title === ''`, since a chain's first segment (e.g. `pa_origin` in `/origin/tabriz/color/red/`) also satisfies `is_tax('pa_origin')` — without that gate a chain page would incorrectly fall into the single-term branch instead of keeping its combined H1.
+
+**Verified live** (Playwright + curl):
+- `/origin/senneh/`, `/origin/tabriz/`, `/shape/rectangle/`: each now shows a real on-page H1 (term name) and its actual description paragraph(s), matching what Yoast's `og:description` already had. Breadcrumbs unchanged (`Home » Senneh`, etc.).
+- `/origin/tabriz/color/red/` (chained): H1 still "Tabriz Red Rugs" as before (§23, unaffected), no description block rendered underneath (not asked for on chains, and combining multiple terms' descriptions has no obviously-correct behavior, so left out rather than guessed) — breadcrumb still the 3-crumb chain trail from §23.
+- `/material/wool/`: the one term across all 8 taxonomies found with a genuinely empty native description (checked all terms via a one-off script) — H1 renders normally, zero `page-header-category-description` elements in the DOM (confirmed via `grep -c`), not an empty/broken block.
+- Zero new console/`pageerror` events across every page tested. `debug.log` size/mtime unchanged (387,084,368 bytes, 2026-08-24 23:28:08).
+
+Deployed via SFTP (paramiko): `templates/header/header-shop.php` only.

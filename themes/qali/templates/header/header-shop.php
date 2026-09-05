@@ -30,6 +30,21 @@ if ($category_term instanceof WP_Term) {
 	$category_seo_description = get_term_meta($category_term->term_id, 'seo_description', true);
 }
 
+/**
+ * Single (non-chained) product-attribute archive page (/origin/senneh/, /shape/rectangle/, …).
+ * Unlike product_cat, these terms already have real per-term descriptions filled in via
+ * wp-admin's native "Description" field — the same one term_description() and Yoast's default
+ * og:description already read — so this reads that instead of adding a second meta box field.
+ * Gated on $chain_title === '' because a chained URL's first segment (e.g. "origin" in
+ * /origin/tabriz/color/red/) also satisfies is_tax('pa_origin'); the chain's own combined H1
+ * (already built) is left as-is, with no per-segment description underneath it.
+ */
+$attribute_taxonomies = ['pa_color', 'pa_design', 'pa_feel', 'pa_material', 'pa_origin', 'pa_shape', 'pa_size', 'pa_thickness'];
+$attribute_term = ($chain_title === '' && is_tax($attribute_taxonomies)) ? get_queried_object() : null;
+$attribute_description = ($attribute_term instanceof WP_Term)
+	? term_description($attribute_term->term_id, $attribute_term->taxonomy)
+	: '';
+
 ?>
 <header id="page-header">
 	<div class="container-fluid">
@@ -39,7 +54,7 @@ if ($category_term instanceof WP_Term) {
 					<img src="<?= URL_ASSETS ?>/img/pattern-2.svg" alt="<?= SITE_NAME ?>">
 				</div>
 			</div>
-			<?php if (function_exists('yoast_breadcrumb') || $category_term instanceof WP_Term || $chain_title !== '') : ?>
+			<?php if (function_exists('yoast_breadcrumb') || $category_term instanceof WP_Term || $chain_title !== '' || $attribute_term instanceof WP_Term) : ?>
 				<div class="col-xl-12">
 					<div class="page-header-seo" data-animate="fadeInDown">
 						<?php if (function_exists('yoast_breadcrumb')) : ?>
@@ -54,6 +69,11 @@ if ($category_term instanceof WP_Term) {
 							<?php endif; ?>
 						<?php elseif ($chain_title !== '') : ?>
 							<h1 class="page-header-category-title"><?= esc_html($chain_title) ?></h1>
+						<?php elseif ($attribute_term instanceof WP_Term) : ?>
+							<h1 class="page-header-category-title"><?= esc_html($attribute_term->name) ?></h1>
+							<?php if (! empty($attribute_description)) : ?>
+								<div class="page-header-category-description"><?= wp_kses_post($attribute_description) ?></div>
+							<?php endif; ?>
 						<?php endif; ?>
 					</div>
 				</div>
