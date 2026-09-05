@@ -26,6 +26,24 @@ if (is_tax('product_cat')) {
 	$archive_term = get_queried_object()->slug;
 }
 
+/**
+ * Every active pa_* attribute constraint on the page right now — the native queried term for a
+ * plain single-attribute archive (/origin/tabriz/), plus any chained segments past the first
+ * (see App\Controller\Shop::parse_attribute_chain()) — so Show More's AJAX request can carry it
+ * forward. Without this, Show More only ever knew about product_cat/product_tag and silently
+ * dropped any pa_* filter on page 2+.
+ */
+$archive_pa_filters = [];
+$queried_object = get_queried_object();
+if ($queried_object instanceof WP_Term && in_array($queried_object->taxonomy, \App\Controller\Shop::$tax_map, true)) {
+	$archive_pa_filters[] = ['taxonomy' => $queried_object->taxonomy, 'slug' => $queried_object->slug];
+}
+foreach (\App\Controller\Shop::$chain_extra_tax as $_taxonomy => $_slugs) {
+	foreach ($_slugs as $_slug) {
+		$archive_pa_filters[] = ['taxonomy' => $_taxonomy, 'slug' => $_slug];
+	}
+}
+
 $progress_pct = $found_posts > 0 ? round(($shown_count / $found_posts) * 100, 2) : 0;
 ?>
 <?php if (have_posts()) : ?>
@@ -33,6 +51,7 @@ $progress_pct = $found_posts > 0 ? round(($shown_count / $found_posts) * 100, 2)
 		id="product-grid-wrap"
 		data-archive-type="<?= esc_attr($archive_type) ?>"
 		data-archive-term="<?= esc_attr($archive_term) ?>"
+		data-archive-pa-filters='<?= esc_attr(wp_json_encode($archive_pa_filters)) ?>'
 		data-current-page="<?= esc_attr($current_page) ?>"
 		data-max-pages="<?= esc_attr($max_pages) ?>"
 		data-found-posts="<?= esc_attr($found_posts) ?>"

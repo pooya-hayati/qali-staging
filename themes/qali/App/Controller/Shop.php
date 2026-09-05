@@ -72,6 +72,14 @@ class Shop
         add_action('pre_get_posts', [$this, 'handle_query']);
         add_filter('query_vars', [$this, 'add_query_vars']);
         add_action('pre_get_posts', [$this, 'modify_search_query']);
+
+        // Chained attribute-archive URLs (/origin/tabriz/color/red/…)
+        add_action('init', [$this, 'register_chain_rewrite_rule']);
+        add_action('parse_request', [$this, 'parse_attribute_chain']);
+        add_filter('wpseo_title', [$this, 'chain_title'], 10, 1);
+        add_filter('wpseo_breadcrumb_links', [$this, 'chain_breadcrumb_links']);
+        add_filter('wpseo_canonical', [$this, 'chain_canonical']);
+        add_filter('wpseo_robots_array', [$this, 'chain_robots']);
     }
     // System
     public function add_woocommerce_support()
@@ -256,10 +264,23 @@ class Shop
         return is_admin() && !wp_doing_ajax();
     }
 
+    /**
+     * ajax_load_more_products() spoofs is_main_query() so this still fires for "Show More" —
+     * but that spoofed query always satisfies is_post_type_archive('product') regardless of what
+     * archive the visitor is actually paging through, so without this override every "Show More"
+     * fetch would get self::PRODUCTS_PER_PAGE (40) even on a pa_* attribute archive, which was
+     * never added to this gate below and so really renders at WooCommerce's own default per-page
+     * (16 on this site). That per-page mismatch made page 2 of a "Show More" fetch land past the
+     * (wrongly-assumed) last page and return nothing. ajax_load_more_products() sets this to
+     * whatever per-page the real page actually used before running its query; every other request
+     * leaves it null and gets the normal self::PRODUCTS_PER_PAGE behavior, unchanged.
+     */
+    public static $ajax_per_page_override = null;
+
     public function change_default_query($query)
     {
         if (!self::is_real_admin_request() && ($query->is_post_type_archive('product') || $query->is_tax('product_cat') || $query->is_tax('product_tag')) && $query->is_main_query()) {
-            $query->set('posts_per_page', self::PRODUCTS_PER_PAGE);
+            $query->set('posts_per_page', self::$ajax_per_page_override ?? self::PRODUCTS_PER_PAGE);
 
             // محصولات ناموجود به انتهای لیست منتقل می‌شوند
             add_filter('posts_clauses', [$this, 'sort_out_of_stock_products_last'], 10, 2);
@@ -567,6 +588,34 @@ class Shop
             $args['product_tag'] = $archive_term;
         }
 
+        // Every active pa_* attribute constraint for the page "Show More" was clicked on — both a
+        // plain single-attribute archive (/origin/tabriz/) and a chained one (/origin/tabriz/color/red/)
+        // — sent by product-grid.php/shop.js as JSON (see data-archive-pa-filters). This admin-ajax.php
+        // request never runs parse_attribute_chain() itself (that's a 'parse_request' hook, and this
+        // is a plain ajax action), so without this the pa_* filter(s) would silently be dropped on
+        // page 2+. Feeding it into self::$chain_extra_tax reuses build_filter_query_args()'s existing
+        // tax_query merge below via the is_main_query() spoof — no second tax_query builder.
+        // Match whatever per-page the real page actually rendered at (see self::$ajax_per_page_override) —
+        // required for pa_* attribute archives, whose real per-page (WooCommerce's own default) differs
+        // from self::PRODUCTS_PER_PAGE; harmless for category/tag/shop pages, which already match today.
+        if (isset($_GET['per_page'])) {
+            $requested_per_page = (int) $_GET['per_page'];
+            if ($requested_per_page > 0 && $requested_per_page <= 100) {
+                self::$ajax_per_page_override = $requested_per_page;
+            }
+        }
+
+        $pa_filters = json_decode(stripslashes((string) ($_GET['archive_pa_filters'] ?? '')), true);
+        if (is_array($pa_filters)) {
+            foreach ($pa_filters as $filter) {
+                $taxonomy = sanitize_key($filter['taxonomy'] ?? '');
+                $slug     = sanitize_title($filter['slug'] ?? '');
+                if ($taxonomy && $slug && taxonomy_exists($taxonomy) && in_array($taxonomy, self::$tax_map, true)) {
+                    self::$chain_extra_tax[$taxonomy][] = $slug;
+                }
+            }
+        }
+
         // WooCommerce's own WC_Query only registers its pre_get_posts hook
         // (product visibility exclusion, default catalog ordering, etc.) when
         // is_admin() was false at plugin construction time — and it's never
@@ -697,10 +746,14 @@ class Shop
 
     // Facet
     public static $tax_map = [
-        'design' => 'pa_design',
-        'color'  => 'pa_color',
-        'origin' => 'pa_origin',
-        'size'   => 'pa_size',
+        'design'    => 'pa_design',
+        'color'     => 'pa_color',
+        'origin'    => 'pa_origin',
+        'size'      => 'pa_size',
+        'feel'      => 'pa_feel',
+        'material'  => 'pa_material',
+        'shape'     => 'pa_shape',
+        'thickness' => 'pa_thickness',
     ];
 
     public static $query_vars = [
@@ -709,14 +762,41 @@ class Shop
         'color',
         'origin',
         'size',
+        'feel',
+        'material',
+        'shape',
+        'thickness',
         'sortby',
         'min_price',
         'max_price'
     ];
 
+    /**
+     * The 8 attribute rewrite-slug bases, matching wp_woocommerce_attribute_taxonomies.attribute_name
+     * (confirmed 1:1 with self::$tax_map's keys) — used to build the chained-URL rewrite rule below.
+     */
+    public static $attribute_bases = ['color', 'design', 'feel', 'material', 'origin', 'shape', 'size', 'thickness'];
+
+    /**
+     * Populated once per request by parse_attribute_chain(), only when a chained attribute
+     * URL (/origin/tabriz/color/red/…) is actually being visited. Ordered exactly as the
+     * segments appeared in the URL; each entry is ['base'=>'origin','taxonomy'=>'pa_origin',
+     * 'slug'=>'tabriz','term'=>WP_Term]. Stays empty for every other request, including the
+     * existing single-attribute archive pages — that's what keeps this purely additive.
+     */
+    public static $chain_terms = [];
+
+    /**
+     * taxonomy => [slug, ...] for every chain segment PAST the first (the first segment is set
+     * as the native pa_{base} query var instead, so WP_Query/is_tax()/Yoast's indexable all see
+     * a real single-term archive query, same as today). build_filter_query_args() merges this in
+     * alongside its existing $_GET-based tax_query — the one shared call site for both.
+     */
+    public static $chain_extra_tax = [];
+
     public static function add_query_vars($vars)
     {
-        return array_merge($vars, self::$query_vars);
+        return array_merge($vars, self::$query_vars, ['qali_chain_base', 'qali_chain_slug', 'qali_chain_rest']);
     }
 
     public static function decode_param($param)
@@ -756,6 +836,17 @@ class Shop
                 'field'    => 'slug',
                 'terms'    => $cat,
                 'include_children' => true,
+            ];
+        }
+
+        // Chained attribute-archive URL segments past the first one (see parse_attribute_chain()).
+        // Same tax_query shape as the $_GET loop above, so this is the one place both the sidebar
+        // filters and the chained URLs build their tax_query — no second/duplicate builder.
+        foreach (self::$chain_extra_tax as $taxonomy => $slugs) {
+            $tax_query[] = [
+                'taxonomy' => $taxonomy,
+                'field'    => 'slug',
+                'terms'    => array_values(array_unique($slugs)),
             ];
         }
 
@@ -818,6 +909,204 @@ class Shop
         }
 
         return $args;
+    }
+
+    /**
+     * Registers ONE rewrite rule for every chained attribute-archive URL, in any order
+     * (/origin/tabriz/color/red/, /color/red/origin/tabriz/, a 3+ way chain, etc.).
+     *
+     * Deliberately requires a 3rd path segment ("(.+)$" after the first base/slug pair) so this
+     * can never match a plain single-attribute URL like /origin/tabriz/ (that regex would need
+     * an empty match there, which "(.+)" — one-or-more chars — cannot satisfy). That keeps this
+     * rule additive by construction: WordPress's own generated pa_* rules (see class-wc-post-types.php
+     * register_taxonomies()) are untouched and still win for every existing single-attribute URL,
+     * regardless of rule ordering.
+     */
+    public function register_chain_rewrite_rule()
+    {
+        $bases = implode('|', array_map('preg_quote', self::$attribute_bases));
+        add_rewrite_rule(
+            '^(' . $bases . ')/([^/]+)/(.+)$',
+            'index.php?qali_chain_base=$matches[1]&qali_chain_slug=$matches[2]&qali_chain_rest=$matches[3]',
+            'top'
+        );
+    }
+
+    /**
+     * Resolves a matched chain rewrite (see register_chain_rewrite_rule()) into real terms.
+     *
+     * The first base/slug pair is turned into the native pa_{base} query var, so the rest of
+     * WordPress/WooCommerce/Yoast treats this exactly like an existing single-attribute archive
+     * page (real is_tax(), real queried object, WC_Query's own pre_get_posts hooks all still
+     * fire) — every segment after that is stashed in self::$chain_extra_tax for
+     * build_filter_query_args() to fold into the same tax_query it already builds.
+     *
+     * Any malformed or unresolvable chain (unknown base, odd segment count, duplicate base,
+     * or a term slug that doesn't exist in the specific taxonomy its base names — e.g. the
+     * pa_shape/pa_size "runner" collision is resolved by which base segment it appeared under,
+     * never guessed) is routed to a real 404 rather than silently serving the wrong products.
+     */
+    public function parse_attribute_chain($wp)
+    {
+        if (empty($wp->query_vars['qali_chain_base'])) {
+            return;
+        }
+
+        $chain_base = sanitize_key($wp->query_vars['qali_chain_base']);
+        $chain_slug = sanitize_title(urldecode((string) $wp->query_vars['qali_chain_slug']));
+        $rest_raw   = trim((string) ($wp->query_vars['qali_chain_rest'] ?? ''), '/');
+
+        unset($wp->query_vars['qali_chain_base'], $wp->query_vars['qali_chain_slug'], $wp->query_vars['qali_chain_rest']);
+
+        $pairs = [[$chain_base, $chain_slug]];
+
+        if ($rest_raw !== '') {
+            $segments = array_values(array_filter(explode('/', $rest_raw), function ($s) {
+                return $s !== '';
+            }));
+            if (count($segments) === 0 || count($segments) % 2 !== 0) {
+                $this->send_404($wp);
+                return;
+            }
+            for ($i = 0; $i < count($segments); $i += 2) {
+                $pairs[] = [sanitize_key($segments[$i]), sanitize_title(urldecode($segments[$i + 1]))];
+            }
+        }
+
+        $seen_bases = [];
+        $resolved   = [];
+        foreach ($pairs as [$base, $slug]) {
+            if ($slug === '' || !isset(self::$tax_map[$base]) || isset($seen_bases[$base])) {
+                $this->send_404($wp);
+                return;
+            }
+            $seen_bases[$base] = true;
+
+            $taxonomy = self::$tax_map[$base];
+            $term     = get_term_by('slug', $slug, $taxonomy);
+            if (!$term || is_wp_error($term)) {
+                $this->send_404($wp);
+                return;
+            }
+
+            $resolved[] = ['base' => $base, 'taxonomy' => $taxonomy, 'slug' => $slug, 'term' => $term];
+        }
+
+        // First segment: make it a real native attribute-archive query, same as visiting it alone.
+        $first = $resolved[0];
+        $wp->query_vars[$first['taxonomy']] = $first['slug'];
+
+        self::$chain_terms = $resolved;
+        foreach (array_slice($resolved, 1) as $extra) {
+            self::$chain_extra_tax[$extra['taxonomy']][] = $extra['slug'];
+        }
+    }
+
+    private function send_404($wp)
+    {
+        $wp->query_vars = ['error' => '404'];
+    }
+
+    /**
+     * Builds the "/base1/slug1/base2/slug2/…/" path for a chain, given an ordered subset of
+     * self::$chain_terms entries. Shared by the breadcrumb and canonical-URL hooks below.
+     */
+    private static function chain_path($terms)
+    {
+        $parts = [];
+        foreach ($terms as $entry) {
+            $parts[] = $entry['base'];
+            $parts[] = $entry['slug'];
+        }
+        return '/' . implode('/', $parts) . '/';
+    }
+
+    /**
+     * H1/title text for a chain: term names in URL order + "Rugs", e.g. "Tabriz Red Rectangle Rugs".
+     * Only ever non-empty on an actual chain page (2+ segments) — a plain single-attribute page
+     * has an empty self::$chain_terms and is left completely alone.
+     */
+    public static function chain_title_text()
+    {
+        if (count(self::$chain_terms) < 2) {
+            return '';
+        }
+        $names = array_map(function ($entry) {
+            return $entry['term']->name;
+        }, self::$chain_terms);
+        return implode(' ', $names) . ' ' . __('Rugs', LANG_STRING);
+    }
+
+    public function chain_title($title)
+    {
+        $text = self::chain_title_text();
+        if ($text === '') {
+            return $title;
+        }
+        return $text . ' - ' . get_bloginfo('name');
+    }
+
+    /**
+     * Replaces Yoast's default single-term crumb with one crumb per active chain filter, in URL
+     * order, each linking to the shorter chain it belongs to (a valid, real page); the current
+     * (last) crumb is left unlinked, matching how Yoast renders every other terminal crumb.
+     */
+    public function chain_breadcrumb_links($crumbs)
+    {
+        if (count(self::$chain_terms) < 2) {
+            return $crumbs;
+        }
+
+        array_pop($crumbs); // drop Yoast's own default crumb for the native pa_{base} term
+
+        $count = count(self::$chain_terms);
+        foreach (self::$chain_terms as $i => $entry) {
+            $is_last  = ($i === $count - 1);
+            $crumbs[] = [
+                'text' => $entry['term']->name,
+                'url'  => $is_last ? '' : home_url(self::chain_path(array_slice(self::$chain_terms, 0, $i + 1))),
+            ];
+        }
+
+        return $crumbs;
+    }
+
+    /**
+     * Points every ordering of the same filter set at one canonical URL (bases sorted
+     * alphabetically) so N-way chains don't create N! duplicate-content variants — each ordering
+     * still renders fully (per spec), it just isn't the one search engines are told to index.
+     */
+    public function chain_canonical($canonical)
+    {
+        if (count(self::$chain_terms) < 2) {
+            return $canonical;
+        }
+        $sorted = self::$chain_terms;
+        usort($sorted, function ($a, $b) {
+            return strcmp($a['base'], $b['base']);
+        });
+        return home_url(self::chain_path($sorted));
+    }
+
+    /**
+     * Minimum product count for a chain combination page to be indexed. Below this, the page
+     * still renders normally (real content, still linkable/crawlable) but is marked noindex,follow
+     * rather than 404 — a thin-but-real combination still helps a visitor navigate.
+     */
+    const CHAIN_NOINDEX_MIN_PRODUCTS = 8;
+
+    public function chain_robots($robots)
+    {
+        if (count(self::$chain_terms) < 2) {
+            return $robots;
+        }
+        global $wp_query;
+        $found = $wp_query instanceof WP_Query ? (int) $wp_query->found_posts : 0;
+        if ($found < self::CHAIN_NOINDEX_MIN_PRODUCTS) {
+            $robots['index']  = 'noindex';
+            $robots['follow'] = 'follow';
+        }
+        return $robots;
     }
 
     public static function handle_query($query)

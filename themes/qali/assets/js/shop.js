@@ -267,6 +267,8 @@ $(function () {
 
   const archiveType = $wrap.data('archive-type') || '';
   const archiveTerm = $wrap.data('archive-term') || '';
+  // jQuery auto-parses this data attribute's JSON into an array of {taxonomy, slug} objects.
+  const archivePaFilters = $wrap.data('archive-pa-filters') || [];
   // 40 here is only a defensive fallback for a missing/zero data-per-page
   // attribute — the real value always comes from that attribute, itself
   // rendered from Shop::PRODUCTS_PER_PAGE (see product-grid.php), so this
@@ -311,6 +313,8 @@ $(function () {
     params.set('paged', page);
     params.set('archive_type', archiveType);
     params.set('archive_term', archiveTerm);
+    params.set('archive_pa_filters', JSON.stringify(archivePaFilters));
+    params.set('per_page', perPage);
     return $.get(URL_AJAX, params.toString());
   }
 

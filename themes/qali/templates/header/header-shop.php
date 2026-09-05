@@ -17,6 +17,8 @@ $prices = $shop->get_min_max_prices();
 $min_price_value = $filters_map['min_price'] ?? $prices['min_price'];
 $max_price_value = $filters_map['max_price'] ?? $prices['max_price'];
 
+$chain_title = \App\Controller\Shop::chain_title_text();
+
 $category_term = is_tax('product_cat') ? get_queried_object() : null;
 $category_seo_title = '';
 $category_seo_description = '';
@@ -37,7 +39,7 @@ if ($category_term instanceof WP_Term) {
 					<img src="<?= URL_ASSETS ?>/img/pattern-2.svg" alt="<?= SITE_NAME ?>">
 				</div>
 			</div>
-			<?php if (function_exists('yoast_breadcrumb') || $category_term instanceof WP_Term) : ?>
+			<?php if (function_exists('yoast_breadcrumb') || $category_term instanceof WP_Term || $chain_title !== '') : ?>
 				<div class="col-xl-12">
 					<div class="page-header-seo" data-animate="fadeInDown">
 						<?php if (function_exists('yoast_breadcrumb')) : ?>
@@ -50,6 +52,8 @@ if ($category_term instanceof WP_Term) {
 							<?php if (! empty($category_seo_description)) : ?>
 								<div class="page-header-category-description"><?= wp_kses_post($category_seo_description) ?></div>
 							<?php endif; ?>
+						<?php elseif ($chain_title !== '') : ?>
+							<h1 class="page-header-category-title"><?= esc_html($chain_title) ?></h1>
 						<?php endif; ?>
 					</div>
 				</div>
