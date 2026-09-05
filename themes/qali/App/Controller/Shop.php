@@ -1091,9 +1091,11 @@ class Shop
     /**
      * Minimum product count for a chain combination page to be indexed. Below this, the page
      * still renders normally (real content, still linkable/crawlable) but is marked noindex,follow
-     * rather than 404 — a thin-but-real combination still helps a visitor navigate.
+     * rather than 404 — a thin-but-real combination still helps a visitor navigate. Set to 2 (only
+     * 0- or 1-product combinations are noindexed) per explicit user direction, given this site's
+     * category sizes — see PROGRESS-LOG.md §23.
      */
-    const CHAIN_NOINDEX_MIN_PRODUCTS = 8;
+    const CHAIN_NOINDEX_MIN_PRODUCTS = 2;
 
     public function chain_robots($robots)
     {
