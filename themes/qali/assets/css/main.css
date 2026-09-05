@@ -802,7 +802,7 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
 }
 
 .product-card-title {
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 500;
   line-height: normal;
   letter-spacing: 0px;
@@ -837,7 +837,7 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
   background-color: var(--color-CarpetRed);
   color: var(--color-White);
   padding: 10px;
-  font: 400 16px/1 "General Sans";
+  font: 400 14px/1 "General Sans";
   letter-spacing: .05rem;
   display: flex;
   justify-content: center;
@@ -1300,6 +1300,24 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
 
 .show-more-btn {
   width: 100%;
+}
+
+.show-more-btn.button-large {
+  height: 44px;
+  padding: 0 16px;
+  font-size: 14px;
+}
+
+.show-more-btn.button-fill-primary {
+  background-color: #780000;
+  border-color: #780000;
+  background-image: none;
+}
+
+.show-more-btn.button-fill-primary:hover {
+  background-color: #5c0000;
+  border-color: #5c0000;
+  color: var(--color-White);
 }
 
 .show-more-btn.is-loading {

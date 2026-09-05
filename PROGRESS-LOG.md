@@ -227,3 +227,19 @@ Replaced the numbered-pagination footer on `archive-product.php`, `taxonomy-prod
 **Known limitation, not fixed (out of scope):** the browser back/forward buttons change the URL (since real history entries were pushed) but don't re-sync the grid's DOM content or progress bar — refreshing at that URL does show the correct state via deep-link hydration, but the in-page back-button experience isn't wired up. Common simplification in this style of "Load More" implementation; would need a `popstate` listener to fully solve.
 
 Deployed via SFTP (paramiko): `Shop.php`, `archive-product.php`, `taxonomy-product_cat.php`, `taxonomy-product_tag.php`, `templates/shop/product-grid.php` (new), `assets/js/shop.js`, `assets/css/main.css`, `assets/css/main.rtl.css` (also added the missing `.button-fill-primary` rule there — present in `main.css` but absent from the RTL stylesheet entirely, which would have left this button, and the pre-existing single-product Add to Cart button, unstyled for RTL/Farsi visitors).
+
+---
+
+## 15. Changed: product grid title/button sizing + restyled the "Show More" button
+
+Three small styling adjustments to the shop/category product grid, applied to both `main.css` and `main.rtl.css`:
+
+1. **`.product-card-title` font-size**: `24px` → `20px` in both files (kept `font-weight: 500`, `line-height: normal`, `letter-spacing: 0`, `margin: 0` unchanged).
+2. **`.product-card-btn`** ("View Details" link) **font-size**: `16px` → `14px`. Found that `main.rtl.css` was missing the `.product-card-btn`/`.product-card-btn:hover` rules entirely (another instance of the drift noted in entry 14) — added them there too, hardcoded to match the file's existing hex-color convention (`#780000`/`#ac1f1f`/`#fff` for `--color-CarpetRed`/`--color-Thunderbird`/`--color-White`), at the new 14px size, so RTL visitors get this button styled at all.
+3. **"Show More" button** (`.show-more-btn`, in `templates/shop/product-grid.php`): scoped all overrides to `.show-more-btn`-prefixed selectors specifically, since `.button-fill-primary`/`.button-large` are shared with the single-product Add to Cart button.
+   - Size: `.show-more-btn.button-large` now sets `height: 44px; padding: 0 16px; font-size: 14px` (was inheriting `.button-large`'s `height: ~56px; padding: 0 20px; font-size: ~24px`).
+   - Color: `.show-more-btn.button-fill-primary` sets `background-color`/`border-color: #780000` (was `#ac1f1f`/Thunderbird via the shared class), `background-image: none` (disables the shared class's white hover-slide animation, which otherwise would have covered our new color), with `.show-more-btn.button-fill-primary:hover` at `#5c0000` and `color` pinned to white so the button just darkens on hover instead of inverting to white/red text.
+
+**Verified live** with Playwright: `product-category/kilim-rug/` (5 products, no Show More) confirmed title=20px and card-btn=14px via computed styles. `/products/` (380 products, paginated) confirmed the Show More button at `font-size: 14px`, `height: 44px`, `padding: 0 16px`, background `rgb(120,0,0)` (#780000) normal / `rgb(92,0,0)` (#5c0000) hover. Single-product page `/product/kilim-turkman-runner-red-rug-2x27-wool-cotton/` confirmed the "Buy Now" button (`.button-fill-primary.button-large`, no `.show-more-btn`) is completely unchanged: `24px`/`56px`/`0 20px` sizing, `#ac1f1f` background, and the original white-slide hover animation still intact.
+
+Deployed via SFTP (paramiko) to `assets/css/main.css` and `assets/css/main.rtl.css`.

@@ -606,7 +606,7 @@ body.nav-open .user-nav > li.nav-toggle > button:nth-child(1) {
   padding: 20px 0 0;
 }
 .product-card-title {
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 500;
   line-height: normal;
   letter-spacing: 0em;
@@ -619,6 +619,21 @@ body.nav-open .user-nav > li.nav-toggle > button:nth-child(1) {
   line-height: normal;
   letter-spacing: 0em;
   color: #5a5852;
+}
+.product-card-btn {
+  background-color: #780000;
+  color: #fff;
+  padding: 10px;
+  font: 400 14px/1 "General Sans";
+  letter-spacing: .05rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-transform: uppercase;
+}
+.product-card-btn:hover {
+  background-color: #ac1f1f;
+  color: #fff;
 }
 .section-featured .section-divider {
   margin-top: 100px;
@@ -896,6 +911,21 @@ body.nav-open .user-nav > li.nav-toggle > button:nth-child(1) {
 }
 .show-more-btn {
   width: 100%;
+}
+.show-more-btn.button-large {
+  height: 44px;
+  padding: 0 16px;
+  font-size: 14px;
+}
+.show-more-btn.button-fill-primary {
+  background-color: #780000;
+  border-color: #780000;
+  background-image: none;
+}
+.show-more-btn.button-fill-primary:hover {
+  background-color: #5c0000;
+  border-color: #5c0000;
+  color: #fff;
 }
 .show-more-btn.is-loading {
   opacity: .6;
