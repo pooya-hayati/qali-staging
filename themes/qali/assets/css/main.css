@@ -805,6 +805,14 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
   height: 100%;
   object-fit: contain;
   display: block;
+  /* object-fit: contain letterboxes/pillarboxes differently depending on
+     each image's own aspect ratio vs the header's fixed 3:4 box. Without an
+     opaque background here, the top (second) image's letterbox gap is
+     transparent and lets the first image's actual pixels show through at
+     that edge — a visible sliver during the crossfade. Matching the
+     header's own background-color makes every image's letterbox area
+     opaque, so the top image always fully covers the one beneath it. */
+  background-color: var(--color-White);
 }
 
 /* Second gallery image, stacked absolutely over the first for a hover
@@ -848,7 +856,13 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
    heart-check glyphs — sized/spaced up from the original 34px badge @
    10px inset / 55% icon (tested 36/40/44px badges live before picking
    40px @ 14px inset / 60% icon as the clearest read without feeling
-   oversized). */
+   oversized). The circle background itself was originally a near-opaque
+   rgba(255,255,255,.85) — read as a stark solid disc rather than sitting
+   softly on the photo. Tested rgba(255,255,255,.55)/no-blur,
+   rgba(255,255,255,.6)/blur(6px), and rgba(255,255,255,.65)/blur(8px) live
+   against both a light and a dark rug before picking .6 + blur(6px): a
+   visibly frosted circle that still keeps the heart clearly legible on
+   both. */
 .product-card-wishlist-badge {
   position: absolute;
   top: 14px;
@@ -856,7 +870,9 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background-color: rgba(255, 255, 255, .85);
+  background-color: rgba(255, 255, 255, .6);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
   justify-content: center;

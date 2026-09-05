@@ -601,6 +601,7 @@ body.nav-open .user-nav > li.nav-toggle > button:nth-child(1) {
   height: 100%;
   object-fit: contain;
   display: block;
+  background-color: #fff;
 }
 .product-card-img-second {
   position: absolute;
@@ -622,7 +623,9 @@ body.nav-open .user-nav > li.nav-toggle > button:nth-child(1) {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background-color: rgba(255, 255, 255, .85);
+  background-color: rgba(255, 255, 255, .6);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
   justify-content: center;
