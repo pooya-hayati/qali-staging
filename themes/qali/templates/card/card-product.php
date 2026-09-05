@@ -23,6 +23,15 @@ $link         = get_permalink($post_id);
 $thumbnail_id = get_post_thumbnail_id($post_id);
 $image_alt    = $thumbnail_id ? get_post_meta($thumbnail_id, '_wp_attachment_image_alt', true) : '';
 $image_alt    = $image_alt ?: $title;
+
+// Hover-swap image: first gallery image after the featured one, if any.
+// Deferred via data-src/data-srcset (set on hover by shop.js) rather than
+// loading="lazy", so products that are never hovered cost zero extra
+// requests/bytes on top of #13's image-weight work.
+$gallery_ids     = $product->get_gallery_image_ids();
+$hover_image_id  = ! empty($gallery_ids) ? reset($gallery_ids) : null;
+$hover_image_src = $hover_image_id ? wp_get_attachment_image_src($hover_image_id, 'qali-product-card-2x') : false;
+$hover_image_srcset = $hover_image_id ? wp_get_attachment_image_srcset($hover_image_id, 'qali-product-card-2x') : false;
 $is_in_stock  = $product->is_in_stock();
 $price        = $product->get_price();
 $price_html   = $product->get_price_html();
@@ -52,6 +61,25 @@ $is_wished    = in_array($post_id, $wishlist, true);
 					itemprop="image"
 					loading="lazy">
 			<?php endif; ?>
+
+			<?php if ($hover_image_src) : ?>
+				<img class="product-card-img product-card-img-hover"
+					data-src="<?php echo esc_url($hover_image_src[0]); ?>"
+					<?php if ($hover_image_srcset) : ?>data-srcset="<?php echo esc_attr($hover_image_srcset); ?>"<?php endif; ?>
+					width="<?php echo esc_attr($hover_image_src[1]); ?>"
+					height="<?php echo esc_attr($hover_image_src[2]); ?>"
+					alt=""
+					aria-hidden="true">
+			<?php endif; ?>
+
+			<span class="product-card-overlay" aria-hidden="true">
+				<span class="product-card-quickview">
+					<svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+						<circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.8" />
+						<path d="M17 17L13.5 13.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+					</svg>
+				</span>
+			</span>
 		</a>
 	</div>
 

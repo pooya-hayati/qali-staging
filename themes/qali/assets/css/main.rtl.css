@@ -579,6 +579,10 @@ body.nav-open .user-nav > li.nav-toggle > button:nth-child(1) {
     max-width: 20%;
   }
 }
+.product-grid {
+  --gutter-x: 2rem;
+  --gutter-y: 2rem;
+}
 .product-card {
   display: flex;
   flex-direction: column;
@@ -589,12 +593,50 @@ body.nav-open .user-nav > li.nav-toggle > button:nth-child(1) {
   aspect-ratio: 3 / 4;
   overflow: hidden;
   background-color: #fff;
+  position: relative;
 }
 .product-card-img {
   width: 100%;
   height: 100%;
   object-fit: contain;
   display: block;
+}
+.product-card-img-hover {
+  position: absolute;
+  top: 0;
+  left: 0;
+  opacity: 0;
+  transition: opacity .3s ease;
+}
+.product-card-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, .25);
+  opacity: 0;
+  transition: opacity .3s ease;
+}
+.product-card-quickview {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #fff;
+  color: #780000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.product-card-quickview svg {
+  width: 20px;
+  height: 20px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .product-card-header:hover .product-card-img-hover,
+  .product-card-header:hover .product-card-overlay {
+    opacity: 1;
+  }
 }
 .product-card-footer {
   margin-top: auto;

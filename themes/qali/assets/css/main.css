@@ -777,6 +777,14 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
   }
 }
 
+/* Wider gutters between product cards than the framework's default .g-3
+   (1rem/16px) — scoped to .product-grid only, via the same --gutter-x/-y
+   custom properties .g-3 sets, so no shared utility class is touched. */
+.product-grid {
+  --gutter-x: 2rem;
+  --gutter-y: 2rem;
+}
+
 .product-card {
   display: flex;
   flex-direction: column;
@@ -788,6 +796,7 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
   aspect-ratio: 3 / 4;
   overflow: hidden;
   background-color: var(--color-White);
+  position: relative;
 }
 
 .product-card-img {
@@ -795,6 +804,52 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
   height: 100%;
   object-fit: contain;
   display: block;
+}
+
+/* Second gallery image, absolutely stacked over the first, fades in on
+   hover (desktop/mouse only — see the (hover: hover) block below). */
+.product-card-img-hover {
+  position: absolute;
+  top: 0;
+  left: 0;
+  opacity: 0;
+  transition: opacity .3s ease;
+}
+
+/* Quick View visual affordance: dark tint + centered icon, same <a> as the
+   image/title so it's just another way to reach the product page. */
+.product-card-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, .25);
+  opacity: 0;
+  transition: opacity .3s ease;
+}
+
+.product-card-quickview {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--color-White);
+  color: var(--color-CarpetRed);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.product-card-quickview svg {
+  width: 20px;
+  height: 20px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .product-card-header:hover .product-card-img-hover,
+  .product-card-header:hover .product-card-overlay {
+    opacity: 1;
+  }
 }
 
 .product-card-footer {
