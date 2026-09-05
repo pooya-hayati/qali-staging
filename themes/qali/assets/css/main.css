@@ -806,48 +806,61 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
   display: block;
 }
 
-/* Second gallery image, absolutely stacked over the first, fades in on
-   hover (desktop/mouse only — see the (hover: hover) block below). */
-.product-card-img-hover {
-  position: absolute;
-  top: 0;
-  left: 0;
-  opacity: 0;
-  transition: opacity .3s ease;
-}
-
-/* Quick View visual affordance: dark tint + centered icon, same <a> as the
-   image/title so it's just another way to reach the product page. */
-.product-card-overlay {
+/* Hover feedback: a flat white tint (not filter: brightness — tested both
+   live; brightness() barely reads on dark rug photos since it scales
+   multiplicatively, while a flat overlay lightens consistently regardless
+   of the photo's own tone) plus a wishlist heart badge, top-right of the
+   image. Both gated to real hover so touch devices never get a "stuck"
+   hover state; the heart is made always-visible for touch separately,
+   below.  */
+.product-card-tint {
   position: absolute;
   inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, .25);
-  opacity: 0;
-  transition: opacity .3s ease;
+  background: rgba(255, 255, 255, 0);
+  transition: background .2s ease;
+  pointer-events: none;
 }
 
-.product-card-quickview {
-  width: 44px;
-  height: 44px;
+/* Wrapper carries the circular badge background; .wishlist-button's own
+   `filter` (recolors its black SVG heart to CarpetRed) applies to the
+   *whole element it's set on*, so the white badge background has to live
+   on an unfiltered ancestor, not on .wishlist-button itself. */
+.product-card-wishlist-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
-  background: var(--color-White);
-  color: var(--color-CarpetRed);
+  background-color: rgba(255, 255, 255, .85);
   display: flex;
   align-items: center;
   justify-content: center;
+  opacity: 0;
+  transition: opacity .2s ease;
+  z-index: 2;
 }
 
-.product-card-quickview svg {
-  width: 20px;
-  height: 20px;
+.product-card-wishlist-badge .wishlist-button {
+  width: 100%;
+  height: 100%;
+  background-size: 55%;
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .product-card-header:hover .product-card-img-hover,
-  .product-card-header:hover .product-card-overlay {
+  .product-card-header:hover .product-card-tint {
+    background: rgba(255, 255, 255, .18);
+  }
+
+  .product-card-header:hover .product-card-wishlist-badge {
+    opacity: 1;
+  }
+}
+
+/* No hover on touch — show the heart always instead of gating it behind a
+   hover that will never fire. */
+@media (hover: none) {
+  .product-card-wishlist-badge {
     opacity: 1;
   }
 }

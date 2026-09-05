@@ -601,45 +601,80 @@ body.nav-open .user-nav > li.nav-toggle > button:nth-child(1) {
   object-fit: contain;
   display: block;
 }
-.product-card-img-hover {
-  position: absolute;
-  top: 0;
-  left: 0;
-  opacity: 0;
-  transition: opacity .3s ease;
-}
-.product-card-overlay {
+.product-card-tint {
   position: absolute;
   inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, .25);
-  opacity: 0;
-  transition: opacity .3s ease;
+  background: rgba(255, 255, 255, 0);
+  transition: background .2s ease;
+  pointer-events: none;
 }
-.product-card-quickview {
-  width: 44px;
-  height: 44px;
+.product-card-wishlist-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
-  background: #fff;
-  color: #780000;
+  background-color: rgba(255, 255, 255, .85);
   display: flex;
   align-items: center;
   justify-content: center;
+  opacity: 0;
+  transition: opacity .2s ease;
+  z-index: 2;
 }
-.product-card-quickview svg {
-  width: 20px;
-  height: 20px;
+.product-card-wishlist-badge .wishlist-button {
+  width: 100%;
+  height: 100%;
+  background-size: 55%;
 }
 @media (hover: hover) and (pointer: fine) {
-  .product-card-header:hover .product-card-img-hover,
-  .product-card-header:hover .product-card-overlay {
+  .product-card-header:hover .product-card-tint {
+    background: rgba(255, 255, 255, .18);
+  }
+  .product-card-header:hover .product-card-wishlist-badge {
+    opacity: 1;
+  }
+}
+@media (hover: none) {
+  .product-card-wishlist-badge {
     opacity: 1;
   }
 }
 .product-card-footer {
   margin-top: auto;
+}
+/* Base wishlist heart icon — was missing from this file entirely (main.css
+   has it, far below, for the logged-in-only wishlist button already used
+   in .product-card-meta and single-product.php); ported here so the new
+   .product-card-wishlist hover badge actually renders for RTL visitors. */
+.wishlist-button {
+  width: 30px;
+  height: 30px;
+  font-size: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" fill="0" viewBox="0 -960 960 960"><path d="M440-501Zm0 381L313-234q-72-65-123.5-116t-85-96q-33.5-45-49-87T40-621q0-94 63-156.5T260-840q52 0 99 22t81 62q34-40 81-62t99-22q81 0 136 45.5T831-680h-85q-18-40-53-60t-73-20q-51 0-88 27.5T463-660h-46q-31-45-70.5-72.5T260-760q-57 0-98.5 39.5T120-621q0 33 14 67t50 78.5q36 44.5 98 104T440-228q26-23 61-53t56-50l9 9 19.5 19.5L605-283l9 9q-22 20-56 49.5T498-172l-58 52Zm280-160v-120H600v-80h120v-120h80v120h120v80H800v120h-80Z"/></svg>');
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center;
+  filter: invert(7%) sepia(67%) saturate(6863%) hue-rotate(1deg) brightness(87%) contrast(109%);
+}
+.wishlist-button.active {
+  background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" fill="0" viewBox="0 -960 960 960"><path d="M718-313 604-426l57-56 57 56 141-141 57 56-198 198ZM440-501Zm0 381L313-234q-72-65-123.5-116t-85-96q-33.5-45-49-87T40-621q0-94 63-156.5T260-840q52 0 99 22t81 62q34-40 81-62t99-22q81 0 136 45.5T831-680h-85q-18-40-53-60t-73-20q-51 0-88 27.5T463-660h-46q-31-45-70.5-72.5T260-760q-57 0-98.5 39.5T120-621q0 33 14 67t50 78.5q36 44.5 98 104T440-228q26-23 61-53t56-50l9 9 19.5 19.5L605-283l9 9q-22 20-56 49.5T498-172l-58 52Z"/></svg>');
+  animation: pulse 0.4s ease;
+}
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 .product-card-body {
   display: flex;

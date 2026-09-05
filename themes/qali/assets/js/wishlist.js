@@ -93,10 +93,15 @@ jQuery(document).ready(function ($) {
   function handleWishlistButton() {
     const $btn = $(this);
     const productId = parseInt($btn.data("product-id"));
+    // Same product can have more than one wishlist-button on screen at once
+    // (e.g. the product-card hover badge and another instance of the same
+    // card elsewhere) — keep every instance of it in sync, not just the one
+    // that was clicked.
+    const $allForProduct = $(`.wishlist-button[data-product-id="${productId}"]`);
 
     if (!wishlist_params.isLoggedIn) {
       updateGuestWishlist(productId);
-      $btn.toggleClass("active");
+      $allForProduct.toggleClass("active");
       return;
     }
 
@@ -106,7 +111,7 @@ jQuery(document).ready(function ($) {
       product_id: productId
     }, function (response) {
       if (response.success) {
-        $btn.toggleClass("active");
+        $allForProduct.toggleClass("active");
         updateWishlistCountBadge();
         showNotification("Wishlist updated", response.data.status === "added" ? "Added to your wishlist." : "Removed from your wishlist.", "info");
       }

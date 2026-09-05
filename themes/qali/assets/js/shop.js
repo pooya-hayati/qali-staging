@@ -125,20 +125,6 @@ if (document.documentElement.lang.toLowerCase() === "en-us") {
 
 $(document).ready(function () {
 
-  // Product card hover-swap: defer the second gallery image's bytes until
-  // the card is actually hovered (delegated so it also covers cards
-  // appended later by the Show More AJAX pagination).
-  $(document).on('mouseenter', '.product-card-header', function () {
-    var $img = $(this).find('.product-card-img-hover[data-src]');
-    if (!$img.length) return;
-
-    var src = $img.attr('data-src');
-    var srcset = $img.attr('data-srcset');
-
-    if (src) $img.attr('src', src).removeAttr('data-src');
-    if (srcset) $img.attr('srcset', srcset).removeAttr('data-srcset');
-  });
-
   // Product Add to cart
   $(".product-action-cart").on("click", function (e) {
     e.preventDefault();
