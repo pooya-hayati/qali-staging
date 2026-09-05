@@ -267,7 +267,14 @@ $(function () {
 
   const archiveType = $wrap.data('archive-type') || '';
   const archiveTerm = $wrap.data('archive-term') || '';
-  const perPage = parseInt($wrap.data('per-page'), 10) || 24;
+  // 40 here is only a defensive fallback for a missing/zero data-per-page
+  // attribute — the real value always comes from that attribute, itself
+  // rendered from Shop::PRODUCTS_PER_PAGE (see product-grid.php), so this
+  // literal has to be kept in sync by hand if that constant ever changes
+  // again (can't share a single source across PHP/JS without wiring up a
+  // localized script var, which felt like overkill for a fallback that
+  // structurally never fires in normal use).
+  const perPage = parseInt($wrap.data('per-page'), 10) || 40;
   let currentPage = parseInt($wrap.data('current-page'), 10) || 1;
   let maxPages = parseInt($wrap.data('max-pages'), 10) || 1;
   let foundPosts = parseInt($wrap.data('found-posts'), 10) || 0;

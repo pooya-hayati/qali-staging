@@ -9,6 +9,16 @@ class Shop
 {
     public $post_name = 'product';
 
+    /**
+     * Single source of truth for the product-archive/category/tag grid's
+     * per-page count. Set once here in change_default_query(); every other
+     * reader (ajax_load_more_products()'s JSON response, product-grid.php's
+     * data-per-page attribute, and from there shop.js) reads it back off the
+     * live WP_Query rather than hardcoding its own copy, so changing this one
+     * constant is enough to keep normal page loads and "Show More" in sync.
+     */
+    const PRODUCTS_PER_PAGE = 40;
+
     public function __construct()
     {
 
@@ -249,7 +259,7 @@ class Shop
     public function change_default_query($query)
     {
         if (!self::is_real_admin_request() && ($query->is_post_type_archive('product') || $query->is_tax('product_cat') || $query->is_tax('product_tag')) && $query->is_main_query()) {
-            $query->set('posts_per_page', '24');
+            $query->set('posts_per_page', self::PRODUCTS_PER_PAGE);
 
             // محصولات ناموجود به انتهای لیست منتقل می‌شوند
             add_filter('posts_clauses', [$this, 'sort_out_of_stock_products_last'], 10, 2);
