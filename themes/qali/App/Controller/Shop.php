@@ -958,6 +958,21 @@ class Shop
 
         unset($wp->query_vars['qali_chain_base'], $wp->query_vars['qali_chain_slug'], $wp->query_vars['qali_chain_rest']);
 
+        /**
+         * Strip a trailing "/page/N" pagination segment before validating the rest as base/slug
+         * pairs. Without this, "page"/"N" gets misread as an unknown attribute base and 404s —
+         * which broke not just chained pagination (/origin/tabriz/color/red/page/2/) but, since
+         * this rule's 'top' priority is tried before WooCommerce's own dedicated page/N rewrite
+         * rule, EVERY single-attribute archive's own reload/deep-link of its "Show More" pushState
+         * URL too (/origin/tabriz/page/2/) — the exact same shop.js pushPageUrl() every archive
+         * type relies on. Found via Playwright while verifying chained "Show More".
+         */
+        $paged = null;
+        if (preg_match('#^(.*?)/?page/([0-9]+)$#', $rest_raw, $page_match)) {
+            $paged = max(1, (int) $page_match[2]);
+            $rest_raw = trim($page_match[1], '/');
+        }
+
         $pairs = [[$chain_base, $chain_slug]];
 
         if ($rest_raw !== '') {
@@ -996,9 +1011,19 @@ class Shop
         $first = $resolved[0];
         $wp->query_vars[$first['taxonomy']] = $first['slug'];
 
-        self::$chain_terms = $resolved;
-        foreach (array_slice($resolved, 1) as $extra) {
-            self::$chain_extra_tax[$extra['taxonomy']][] = $extra['slug'];
+        if ($paged !== null) {
+            $wp->query_vars['paged'] = $paged;
+        }
+
+        // Only a genuine 2+ chain populates self::$chain_terms — a URL that turned out to be just
+        // "base/slug/page/N" (no real second filter) is a plain single-attribute archive page with
+        // pagination, same as visiting it without the rewrite rule at all, and every consumer of
+        // self::$chain_terms already gates on count() >= 2, so this keeps that invariant exact.
+        if (count($resolved) >= 2) {
+            self::$chain_terms = $resolved;
+            foreach (array_slice($resolved, 1) as $extra) {
+                self::$chain_extra_tax[$extra['taxonomy']][] = $extra['slug'];
+            }
         }
     }
 

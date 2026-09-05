@@ -473,3 +473,25 @@ A follow-up requested earlier (the attribute-page H1 the §23 chaining plan refe
 - Zero new console/`pageerror` events across every page tested. `debug.log` size/mtime unchanged (387,084,368 bytes, 2026-08-24 23:28:08).
 
 Deployed via SFTP (paramiko): `templates/header/header-shop.php` only.
+
+## 25. Verified §23's breadcrumb and "Show More" on chained URLs — found and fixed a real pagination-reload bug
+
+Requested re-verification, with evidence, of two §23 requirements that had been implemented but never explicitly confirmed afterward. Inspected the actual current code first (`Shop::chain_breadcrumb_links()`, `product-grid.php`'s `data-archive-pa-filters`, `shop.js`'s `fetchPage()`/`pushPageUrl()`) before testing anything, per the task's instruction.
+
+**1. Breadcrumb: was already working, confirmed with evidence.** On `/origin/tabriz/color/red/shape/rectangle/`, Playwright confirmed the breadcrumb renders `Home » Tabriz » Red » Rectangle` with `Tabriz` and `Red` as real `<a>` links (`Rectangle` correctly unlinked, current page) — clicking "Red" navigated to `/origin/tabriz/color/red/` exactly, dropping "rectangle" as expected. Screenshots and the crumbs' actual `href` values captured. No code change needed.
+
+**2. "Show More": data/dedup logic was already working; the URL/history piece was not — found and fixed.** The AJAX exchange itself was correct (`archive_pa_filters` carried all 3 active taxonomy constraints, `16 of 17` → `17 of 17`, one new product appended, zero duplicate IDs, zero console errors) — but the task's explicit "URL/history updates consistently with how it behaves on single-attribute pages" check surfaced a real bug: `shop.js`'s `pushPageUrl()` (shared by every archive type, unchanged since §23) pushed `/origin/tabriz/color/red/shape/rectangle/page/2/` into the address bar after one click, and **reloading that exact URL 404'd**.
+
+Root cause, traced rather than guessed: `Shop::register_chain_rewrite_rule()`'s pattern (`^(bases)/([^/]+)/(.+)$`, registered with `'top'` priority) matches *any* path with a 3rd segment — including `origin/tabriz/page/2/`, which it was intercepting **before WooCommerce's own dedicated `page/N` rewrite rule** ever got a chance. `parse_attribute_chain()` then tried to read `"page"`/`"2"` as an unknown attribute base/slug pair and 404'd. This meant `/page/N/` reloads had been silently broken since §23 shipped — **for every single-attribute archive page's own "Show More" deep-link/reload, not just chained ones** (verified: `/origin/tabriz/page/2/` and `/color/red/page/2/` both 404'd too, pre-fix).
+
+**Fix** (`Shop::parse_attribute_chain()`): before validating the trailing path as base/slug pairs, strip a trailing `/page/N` segment via `preg_match('#^(.*?)/?page/([0-9]+)$#', ...)` and set `$wp->query_vars['paged']` from it directly — mirroring what WooCommerce's own `page\/?([0-9]{1,})\/?$` rule already does for the plain single-attribute case. Also tightened `self::$chain_terms` to only ever populate for a genuine 2+ segment chain (a URL that resolves to just `base/slug` + a page suffix, with no real second filter, is treated exactly like a plain single-attribute archive with pagination — consistent with every consumer of `$chain_terms` already gating on `count() >= 2`).
+
+**Verified live after the fix** (curl + Playwright, full re-run):
+- `/origin/tabriz/page/2/`, `/color/red/page/2/`: now 200 (were 404), correct `data-current-page="2"`.
+- `/origin/tabriz/color/red/shape/rectangle/page/2/`: now 200, correct H1 ("Tabriz Red Rectangle Rugs" — confirms the chain itself is still intact after the fix, not silently downgraded), `data-current-page="2"`, `data-found-posts="17"`, the correct single remaining product.
+- Plain chain URL with no page suffix (`/origin/tabriz/color/red/shape/rectangle/`) and a malformed chain (`/origin/tabriz/color/`) still behave exactly as before (200 / 404 respectively) — the fix is additive, not a rewrite of the existing logic.
+- `product_cat`/`product_tag` pagination (a completely separate, untouched WooCommerce-native rule) spot-checked unaffected: `/product-category/colorful-vintage/page/2/` → 200.
+- Full Playwright re-run: breadcrumb click-through, "Show More" click, and `reload_pushed_url_status: 200` (was 404 pre-fix) all in one pass, zero console errors.
+- `debug.log` size/mtime unchanged (387,084,368 bytes, 2026-08-24 23:28:08) throughout both the pre-fix bug discovery and the post-fix verification.
+
+Deployed via SFTP (paramiko): `App/Controller/Shop.php` only.
