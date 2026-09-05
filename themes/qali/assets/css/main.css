@@ -844,10 +844,10 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
   pointer-events: none;
 }
 
-/* Wrapper carries the circular badge background; .wishlist-button's own
-   `filter` (recolors its black SVG heart to CarpetRed) applies to the
-   *whole element it's set on*, so the white badge background has to live
-   on an unfiltered ancestor, not on .wishlist-button itself.
+/* Wrapper carries the badge background; .wishlist-button's own base `filter`
+   (recolors its SVG to CarpetRed everywhere else it's used) is reset to
+   `none` here so the badge's own icon colors (baked directly into its SVGs
+   below, not filter-derived) aren't double-recolored.
 
    The icon itself is overridden here (not in the shared .wishlist-button
    rule further down, which stays untouched for its other usages in
@@ -856,21 +856,23 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
    heart-check glyphs — sized/spaced up from the original 34px badge @
    10px inset / 55% icon (tested 36/40/44px badges live before picking
    40px @ 14px inset / 60% icon as the clearest read without feeling
-   oversized). The circle background itself was originally a near-opaque
-   rgba(255,255,255,.85) — read as a stark solid disc rather than sitting
-   softly on the photo. Tested rgba(255,255,255,.55)/no-blur,
-   rgba(255,255,255,.6)/blur(6px), and rgba(255,255,255,.65)/blur(8px) live
-   against both a light and a dark rug before picking .6 + blur(6px): a
-   visibly frosted circle that still keeps the heart clearly legible on
-   both. */
+   oversized).
+
+   Shape/color: a circle read as too geometric/stark against the reference
+   design's softer "squircle" look. Tested 12px/14px/16px border-radius
+   paired with rgba(Mushroom, .35/.45/.55) live against a light and a dark
+   rug — picked 14px + .45 as the clearest "soft rounded tint" without
+   looking either sharp-cornered or like an undefined blob. Color is
+   rgba() off --color-Mushroom (#b7927a), the closest existing warm-neutral
+   token in the palette, rather than a new hardcoded hex. */
 .product-card-wishlist-badge {
   position: absolute;
   top: 14px;
   right: 14px;
   width: 40px;
   height: 40px;
-  border-radius: 50%;
-  background-color: rgba(255, 255, 255, .6);
+  border-radius: 14px;
+  background-color: rgba(183, 146, 122, .45);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   display: flex;
@@ -885,11 +887,20 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
   width: 100%;
   height: 100%;
   background-size: 60%;
-  background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>');
+  filter: none;
+  background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%230d0d0c" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>');
+  transition: background-image .15s ease;
 }
 
-.product-card-wishlist-badge .wishlist-button.active {
-  background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="black"><path d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"/></svg>');
+/* Two-stage hover, matching the reference: hovering the card fades the
+   whole badge in (opacity rule below, unchanged from before) at the dark
+   outline / beige-tint default state above. Hovering the badge itself is a
+   second, more specific target — previews the solid red heart, same as the
+   persisted `.active` (already-wishlisted) state, so hovering an
+   already-active heart is a no-op rather than a flicker. */
+.product-card-wishlist-badge .wishlist-button.active,
+.product-card-wishlist-badge:hover .wishlist-button {
+  background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="%23780000"><path d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"/></svg>');
 }
 
 @media (hover: hover) and (pointer: fine) {

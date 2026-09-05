@@ -349,3 +349,25 @@ Two bug reports against #18's hover crossfade + heart badge, both in `main.css`/
 - Zero new console/`pageerror` events across all viewports and both the injected-candidate testing and the real post-deploy verification. `debug.log` size/mtime unchanged (387,084,368 bytes, 2026-08-24 23:28:08) — expected, since this was a CSS-only fix.
 
 Deployed via SFTP (paramiko): `assets/css/main.css`, `assets/css/main.rtl.css` only.
+
+---
+
+## 20. Redesigned the wishlist badge to a warm "squircle" with a two-stage hover
+
+Matched the wishlist heart badge to a reference design with two distinct hover states, in `main.css`/`main.rtl.css` only.
+
+**Shape/color.** Circle → rounded-square: tested `border-radius` 12px/14px/16px paired with `rgba(Mushroom, .35/.45/.55)` live against both the light and dark reference rugs from #19; picked **`border-radius: 14px`** (clearly a "squircle," not sharp-cornered or fully round) and **`rgba(183, 146, 122, .45)`** — `rgba()` off the existing `--color-Mushroom` (`#b7927a`) token rather than inventing a new hex, since it's the closest existing warm-neutral in the palette to the requested beige/tan. Kept the `backdrop-filter: blur(6px)` frosted treatment from #19.
+
+**Two-stage hover.** Previously the badge's icon inherited the shared `.wishlist-button` rule's `filter: var(--filter-CarpetRed)`, so the outline heart was already tinted red even at rest — not what this design calls for. Reset `filter: none` on the badge-scoped `.wishlist-button` and moved the red entirely into the SVGs themselves (`stroke="%230d0d0c"` for the dark outline default, `fill="%23780000"` — the site's existing `--color-CarpetRed` hex — for the solid state), so there's no filter-chain dependency left in the badge:
+- **Stage 1** (hover anywhere on `.product-card-header`, already existing): fades the whole badge in at its default state — beige squircle, dark (`#0d0d0c`) outline heart. Unchanged mechanism from #17, just the new default icon color.
+- **Stage 2** (hover directly on `.product-card-wishlist-badge`, new — a more specific/nested target only reachable once stage 1 has revealed it): `.product-card-wishlist-badge:hover .wishlist-button` swaps to the solid `#780000` filled heart. Shares its selector with `.wishlist-button.active` (the persisted "already wishlisted" state) rather than being a separate rule with the same image, so hovering an already-active heart is a no-op instead of a flicker between two visually-identical-but-distinct rules.
+
+**Verified live** on `product-category/colorful-vintage/` with Playwright, post-deploy, on both the light (Kashan Blue 8×11) and dark (Bakhtiari Blue 6×9) rugs from #19:
+- Computed style confirms deployed values: `border-radius: 14px`, `background-color: rgba(183, 146, 122, 0.45)`, `backdrop-filter: blur(6px)`.
+- Stage 1 (card-hover only): `background-image` on `.wishlist-button` contains no `780000` (dark outline, not red) — confirmed programmatically, not just visually, on both rugs.
+- Stage 2 (badge-hover): `background-image` switches to contain `780000` (solid red) — confirmed on both rugs. Screenshotted all four states (2 rugs × 2 stages).
+- Wishlist click-to-toggle re-confirmed working end-to-end: click → `.active` class added, `background-image` contains `780000`, persists without further hovering; second click removes `.active`. Mechanism itself (`handleWishlistButton()`, AJAX/localStorage flow) untouched — this was a CSS-only diff.
+- 390px mobile (iPhone 13 emulation): badge computed `opacity: 1` (always-visible touch rule from #17 intact), `border-radius: 14px`/beige background carried over correctly; tapped the heart — screenshotted the "Product added to wishlist" toast with the heart now solid red, confirming the persisted `.active` state (not the hover state, which doesn't exist on touch) drives the correct visual on mobile.
+- Zero broken images, zero new console/`pageerror` events. `debug.log` size/mtime unchanged (387,084,368 bytes, 2026-08-24 23:28:08) — expected for a CSS-only change.
+
+Deployed via SFTP (paramiko): `assets/css/main.css`, `assets/css/main.rtl.css` only.
