@@ -825,12 +825,15 @@ class Shop
     /**
      * Priority order for the "suggested next filter" chip row (see get_next_filter_suggestion()):
      * the first dimension in this list NOT already active in the current URL is the one suggested.
-     * Reduced from all 8 attribute dimensions to these 4 per explicit user direction — design,
-     * material, feel, and thickness should never be suggested as a chip, though they remain fully
-     * functional as sidebar filters and in manually-typed chain URLs; only this chip-suggestion
-     * priority list is narrowed.
+     * Reduced from all 8 attribute dimensions to these 3 per explicit user direction — design,
+     * material, feel, thickness, and (as of this list) size should never be suggested as a chip,
+     * though they remain fully functional as sidebar filters (size in particular is a normal
+     * sidebar <select>) and in manually-typed chain URLs; only this chip-suggestion priority list
+     * is narrowed. A fully-chained origin+color+shape page naturally yields an empty $remaining
+     * in get_next_filter_suggestion() and renders no chip row — no separate depth-cap constant
+     * needed, the 3-element list itself is the cap.
      */
-    const NEXT_FILTER_PRIORITY = ['origin', 'color', 'shape', 'size'];
+    const NEXT_FILTER_PRIORITY = ['origin', 'color', 'shape'];
 
     /** Cap on how many candidate-term chips are rendered for the suggested dimension. */
     const NEXT_FILTER_CHIP_CAP = 12;
@@ -892,8 +895,9 @@ class Shop
      *
      * Returns null when $active is empty (product_cat, shop, etc. should pass []), when every
      * dimension is already active, or — recursing past it — when a dimension turns out to have
-     * zero viable candidates against the current chain at all (rather than showing an empty
-     * suggestion for a dead-end dimension).
+     * fewer than 2 viable candidates against the current chain (zero is a dead end same as
+     * before; exactly 1 is now treated the same way, since a lone chip with no alternative gives
+     * the visitor no real choice and isn't useful navigation).
      */
     public static function get_next_filter_suggestion($active, $skip_bases = [])
     {
@@ -938,7 +942,7 @@ class Shop
             }
         }
 
-        if (empty($candidates)) {
+        if (count($candidates) < 2) {
             return self::get_next_filter_suggestion($active, array_merge($skip_bases, [$next_base]));
         }
 
