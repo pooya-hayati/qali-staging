@@ -59,7 +59,7 @@ $progress_pct = $found_posts > 0 ? round(($shown_count / $found_posts) * 100, 2)
 		<div class="product-grid row g-3" id="product-grid">
 			<?php while (have_posts()) : the_post(); ?>
 				<div class="col-sm-6 col-md-4 col-xl-5th">
-					<?php get_template_part_var('templates/card/card-product.php', ['post' => get_post()]) ?>
+					<?php get_template_part_var('templates/card/card-product.php', ['post' => get_post(), 'no_animate' => true]) ?>
 				</div>
 			<?php endwhile ?>
 		</div>

@@ -35,8 +35,17 @@ $wishlist     = is_array($wishlist) ? $wishlist : [];
 $is_wished    = in_array($post_id, $wishlist, true);
 $gallery_ids  = $product->get_gallery_image_ids();
 $second_id    = ! empty($gallery_ids) ? absint($gallery_ids[0]) : 0;
+
+/**
+ * Shop/category archive grids (templates/shop/product-grid.php, and its "Show More" AJAX
+ * counterpart in Shop::ajax_load_more_products()) pass no_animate=true so these cards render at
+ * full opacity immediately instead of waiting for GSAP ScrollTrigger's scroll-triggered
+ * fadeInUp reveal — that reveal is still used for this same template elsewhere (e.g. the
+ * homepage's featured-products section in page-home.php), which is intentionally left alone.
+ */
+$animate = empty($this->no_animate);
 ?>
-<article class="product-card" data-animate="fadeInUp" itemscope itemtype="https://schema.org/Product">
+<article class="product-card"<?php echo $animate ? ' data-animate="fadeInUp"' : ''; ?> itemscope itemtype="https://schema.org/Product">
 	<div class="product-card-header">
 		<a href="<?php echo esc_url($link); ?>"
 			aria-label="<?php echo esc_attr(sprintf(__('View product: %s', LANG_STRING), $title)); ?>">

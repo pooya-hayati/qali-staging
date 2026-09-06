@@ -694,7 +694,7 @@ class Shop
             $GLOBALS['post'] = $product_post;
             setup_postdata($product_post);
             echo '<div class="col-sm-6 col-md-4 col-xl-5th">';
-            get_template_part_var('templates/card/card-product.php', ['post' => $product_post]);
+            get_template_part_var('templates/card/card-product.php', ['post' => $product_post, 'no_animate' => true]);
             echo '</div>';
         }
         wp_reset_postdata();
@@ -1569,21 +1569,33 @@ class Shop
      * Replaces Yoast's default single-term crumb with one crumb per active chain filter, in URL
      * order, each linking to the shorter chain it belongs to (a valid, real page); the current
      * (last) crumb is left unlinked, matching how Yoast renders every other terminal crumb.
+     *
+     * Handles both chain shapes: a pure pa_*-only chain (self::$chain_terms, e.g.
+     * /origin/tabriz/color/red/) and a category-leading chain (self::$category_chain_terms, e.g.
+     * /product-category/colorful-vintage/origin/tabriz/) — the two are mutually exclusive per
+     * request (see parse_category_attribute_chain()'s own comment), and chain_path() already
+     * builds the right URL for either: a category_chain_terms entry's 'base' => 'product-category'
+     * is the real literal first path segment for that page, same as any pa_{base} entry's own
+     * base is for a pure attribute chain.
      */
     public function chain_breadcrumb_links($crumbs)
     {
-        if (count(self::$chain_terms) < 2) {
+        if (count(self::$category_chain_terms) >= 2) {
+            $chain = self::$category_chain_terms;
+        } elseif (count(self::$chain_terms) >= 2) {
+            $chain = self::$chain_terms;
+        } else {
             return $crumbs;
         }
 
-        array_pop($crumbs); // drop Yoast's own default crumb for the native pa_{base} term
+        array_pop($crumbs); // drop Yoast's own default crumb for the native queried term
 
-        $count = count(self::$chain_terms);
-        foreach (self::$chain_terms as $i => $entry) {
+        $count = count($chain);
+        foreach ($chain as $i => $entry) {
             $is_last  = ($i === $count - 1);
             $crumbs[] = [
                 'text' => $entry['term']->name,
-                'url'  => $is_last ? '' : home_url(self::chain_path(array_slice(self::$chain_terms, 0, $i + 1))),
+                'url'  => $is_last ? '' : home_url(self::chain_path(array_slice($chain, 0, $i + 1))),
             ];
         }
 
