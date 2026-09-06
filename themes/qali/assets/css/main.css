@@ -1750,8 +1750,8 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
 .next-filter-chip-icon {
   display: inline-flex;
   flex-shrink: 0;
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   color: var(--color-Neutral-700);
 }
 

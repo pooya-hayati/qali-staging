@@ -45,12 +45,12 @@ $attribute_description = ($attribute_term instanceof WP_Term)
 	? term_description($attribute_term->term_id, $attribute_term->taxonomy)
 	: '';
 
-// "Suggested next filter" chips — any pa_* archive page, single-attribute or chained, never
-// product_cat (both branches above are the only things that ever populate $chain_title or
-// $attribute_term, so gating on those two is exactly "is this a pa_* archive page").
-$next_filter_active = ($chain_title !== '' || $attribute_term instanceof WP_Term)
-	? \App\Controller\Shop::get_active_path_bases()
-	: [];
+// "Suggested next filter" chips — any pa_* archive page (single-attribute or chained) and, as of
+// this task, product_cat pages too (plain, e.g. /product-category/colorful-vintage/, or chained
+// with attributes, e.g. /product-category/colorful-vintage/origin/tabriz/). get_active_path_bases()
+// itself is the single source of truth for "is this a page the chip row belongs on" — it already
+// returns [] for every other page type (shop, blog, etc.), so no separate gate is needed here.
+$next_filter_active = \App\Controller\Shop::get_active_path_bases();
 $next_filter_suggestion = !empty($next_filter_active)
 	? \App\Controller\Shop::get_next_filter_suggestion($next_filter_active)
 	: null;

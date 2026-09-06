@@ -84,6 +84,30 @@ class Shop
         add_filter('wpseo_breadcrumb_links', [$this, 'chain_breadcrumb_links']);
         add_filter('wpseo_canonical', [$this, 'chain_canonical']);
         add_filter('wpseo_robots_array', [$this, 'chain_robots']);
+
+        // Category + attribute chained URLs (/product-category/colorful-vintage/origin/tabriz/…) —
+        // separate rewrite rule/query vars from the attribute-only chain above so the two parsers
+        // never both fire on the same request (see parse_category_attribute_chain()'s docblock).
+        add_action('init', [$this, 'register_category_chain_rewrite_rule']);
+        add_action('parse_request', [$this, 'parse_category_attribute_chain']);
+
+        // A newly add_rewrite_rule()'d pattern has no effect until the cached `rewrite_rules`
+        // option is regenerated — normally done by re-saving Permalinks in wp-admin, which this
+        // environment has no credentialed access to trigger. Self-flushing once, on the next real
+        // request after this file deploys, avoids needing that: priority 20 (after the 'init'
+        // rewrite-rule registrations above, both still default priority 10) so the new rule is
+        // already registered when the flush runs; the version-gated option makes it a no-op on
+        // every request after the first. Bump the version string whenever a rewrite rule changes.
+        add_action('init', [$this, 'maybe_flush_rewrite_rules'], 20);
+    }
+
+    public function maybe_flush_rewrite_rules()
+    {
+        $version = '2026-09-06-category-chain';
+        if (get_option('qali_rewrite_rules_version') !== $version) {
+            flush_rewrite_rules();
+            update_option('qali_rewrite_rules_version', $version);
+        }
     }
     // System
     public function add_woocommerce_support()
@@ -801,8 +825,12 @@ class Shop
     /**
      * Priority order for the "suggested next filter" chip row (see get_next_filter_suggestion()):
      * the first dimension in this list NOT already active in the current URL is the one suggested.
+     * Reduced from all 8 attribute dimensions to these 4 per explicit user direction — design,
+     * material, feel, and thickness should never be suggested as a chip, though they remain fully
+     * functional as sidebar filters and in manually-typed chain URLs; only this chip-suggestion
+     * priority list is narrowed.
      */
-    const NEXT_FILTER_PRIORITY = ['origin', 'color', 'design', 'shape', 'size', 'material', 'feel', 'thickness'];
+    const NEXT_FILTER_PRIORITY = ['origin', 'color', 'shape', 'size'];
 
     /** Cap on how many candidate-term chips are rendered for the suggested dimension. */
     const NEXT_FILTER_CHIP_CAP = 12;
@@ -813,15 +841,28 @@ class Shop
     }
 
     /**
-     * The ordered, path-based attribute filter currently active for this request — a single
-     * native archive term (1 entry, for a plain /origin/tabriz/ page) or a full chain (2+ entries,
-     * from self::$chain_terms, for /origin/tabriz/color/red/). Empty on any other page (product_cat,
-     * shop, non-product pages) — this is what keeps the "next filter" feature out of those.
+     * The ordered, path-based filter currently active for this request — a single native
+     * archive term (1 entry, for a plain /origin/tabriz/ or /product-category/colorful-vintage/
+     * page), a full pa_*-only chain (2+ entries, from self::$chain_terms, for
+     * /origin/tabriz/color/red/), or a category+attribute chain (1+ entries, from
+     * self::$category_chain_terms, for /product-category/colorful-vintage/origin/tabriz/).
+     * Empty only on a genuinely unrelated page (shop, a non-product page, etc.).
      */
     public static function get_active_path_bases()
     {
+        if (!empty(self::$category_chain_terms)) {
+            return self::$category_chain_terms;
+        }
+
         if (!empty(self::$chain_terms)) {
             return self::$chain_terms;
+        }
+
+        if (is_tax('product_cat')) {
+            $term = get_queried_object();
+            if ($term instanceof WP_Term) {
+                return [['base' => 'product-category', 'taxonomy' => 'product_cat', 'slug' => $term->slug, 'term' => $term]];
+            }
         }
 
         if (is_tax(self::attribute_taxonomies())) {
@@ -1074,7 +1115,7 @@ class Shop
             return '';
         }
 
-        return '<svg width="16" height="16" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'
+        return '<svg width="20" height="20" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'
             . $shapes[$slug]
             . '</svg>';
     }
@@ -1100,11 +1141,13 @@ class Shop
             foreach ($active_raw as $entry) {
                 $base = sanitize_key($entry['base'] ?? '');
                 $slug = sanitize_title($entry['slug'] ?? '');
-                if ($base === '' || $slug === '' || !isset(self::$tax_map[$base])) {
+                if ($base === '' || $slug === '') {
                     continue;
                 }
-                $taxonomy = self::$tax_map[$base];
-                if (!get_term_by('slug', $slug, $taxonomy)) {
+                // 'product-category' isn't a self::$tax_map key (it's product_cat, not a pa_*
+                // attribute) — same special-case as get_active_path_bases()/get_next_filter_suggestion().
+                $taxonomy = ($base === 'product-category') ? 'product_cat' : (self::$tax_map[$base] ?? null);
+                if (!$taxonomy || !get_term_by('slug', $slug, $taxonomy)) {
                     continue;
                 }
                 $active[] = ['base' => $base, 'taxonomy' => $taxonomy, 'slug' => $slug];
@@ -1125,7 +1168,10 @@ class Shop
 
     public static function add_query_vars($vars)
     {
-        return array_merge($vars, self::$query_vars, ['qali_chain_base', 'qali_chain_slug', 'qali_chain_rest']);
+        return array_merge($vars, self::$query_vars, [
+            'qali_chain_base', 'qali_chain_slug', 'qali_chain_rest',
+            'qali_cat_chain_slug', 'qali_cat_chain_base', 'qali_cat_chain_term', 'qali_cat_chain_rest',
+        ]);
     }
 
     public static function decode_param($param)
@@ -1354,6 +1400,121 @@ class Shop
                 self::$chain_extra_tax[$extra['taxonomy']][] = $extra['slug'];
             }
         }
+    }
+
+    /**
+     * Category + one-or-more attribute segments (/product-category/{slug}/{attr-base}/{attr-slug}/…/),
+     * populated only when register_category_chain_rewrite_rule()'s pattern actually matched.
+     * Unlike the pa_*-only chain above, a *single* trailing attribute pair is already a complete,
+     * valid chain here (there's no separate native WooCommerce rule for
+     * "category + one attribute" to fall back to the way a plain /origin/tabriz/ falls back to
+     * its own native rule) — see register_category_chain_rewrite_rule()'s regex.
+     */
+    public static $category_chain_terms = [];
+
+    public function register_category_chain_rewrite_rule()
+    {
+        $bases = implode('|', array_map('preg_quote', self::$attribute_bases));
+        add_rewrite_rule(
+            '^product-category/([^/]+)/(' . $bases . ')/([^/]+)/?(.*)$',
+            'index.php?qali_cat_chain_slug=$matches[1]&qali_cat_chain_base=$matches[2]&qali_cat_chain_term=$matches[3]&qali_cat_chain_rest=$matches[4]',
+            'top'
+        );
+    }
+
+    /**
+     * Resolves a matched category-chain rewrite into a real product_cat term plus one or more
+     * real attribute terms. Deliberately uses its own query var names (qali_cat_chain_*, not
+     * parse_attribute_chain()'s qali_chain_*) so the two `parse_request` handlers never both act
+     * on the same request — this one's URL always starts with the literal "product-category/"
+     * prefix, which register_chain_rewrite_rule()'s pattern (first segment must be one of the 8
+     * attribute base words) can never match, and vice versa.
+     *
+     * The category becomes the real native `product_cat` query var (same trick
+     * parse_attribute_chain() uses for pa_{base} — WP_Query/is_tax()/WC_Query's own hooks and the
+     * existing category H1/description branch in header-shop.php all see a genuine category
+     * archive query, unchanged), so this is purely additive: a plain `/product-category/{slug}/`
+     * URL never matches this rule's pattern at all and keeps using WooCommerce's own native rule.
+     */
+    public function parse_category_attribute_chain($wp)
+    {
+        if (empty($wp->query_vars['qali_cat_chain_slug'])) {
+            return;
+        }
+
+        $cat_slug   = sanitize_title(urldecode((string) $wp->query_vars['qali_cat_chain_slug']));
+        $first_base = sanitize_key((string) $wp->query_vars['qali_cat_chain_base']);
+        $first_slug = sanitize_title(urldecode((string) $wp->query_vars['qali_cat_chain_term']));
+        $rest_raw   = trim((string) ($wp->query_vars['qali_cat_chain_rest'] ?? ''), '/');
+
+        unset(
+            $wp->query_vars['qali_cat_chain_slug'],
+            $wp->query_vars['qali_cat_chain_base'],
+            $wp->query_vars['qali_cat_chain_term'],
+            $wp->query_vars['qali_cat_chain_rest']
+        );
+
+        $category_term = get_term_by('slug', $cat_slug, 'product_cat');
+        if (!$category_term || is_wp_error($category_term)) {
+            $this->send_404($wp);
+            return;
+        }
+
+        // Same trailing "/page/N" handling as parse_attribute_chain() (see §25 in PROGRESS-LOG.md
+        // for why this rule's own 'top' priority would otherwise swallow a Show More reload).
+        $paged = null;
+        if (preg_match('#^(.*?)/?page/([0-9]+)$#', $rest_raw, $page_match)) {
+            $paged = max(1, (int) $page_match[2]);
+            $rest_raw = trim($page_match[1], '/');
+        }
+
+        $pairs = [[$first_base, $first_slug]];
+        if ($rest_raw !== '') {
+            $segments = array_values(array_filter(explode('/', $rest_raw), function ($s) {
+                return $s !== '';
+            }));
+            if (count($segments) === 0 || count($segments) % 2 !== 0) {
+                $this->send_404($wp);
+                return;
+            }
+            for ($i = 0; $i < count($segments); $i += 2) {
+                $pairs[] = [sanitize_key($segments[$i]), sanitize_title(urldecode($segments[$i + 1]))];
+            }
+        }
+
+        $seen_bases = [];
+        $resolved   = [];
+        foreach ($pairs as [$base, $slug]) {
+            if ($slug === '' || !isset(self::$tax_map[$base]) || isset($seen_bases[$base])) {
+                $this->send_404($wp);
+                return;
+            }
+            $seen_bases[$base] = true;
+
+            $taxonomy = self::$tax_map[$base];
+            $term     = get_term_by('slug', $slug, $taxonomy);
+            if (!$term || is_wp_error($term)) {
+                $this->send_404($wp);
+                return;
+            }
+
+            $resolved[] = ['base' => $base, 'taxonomy' => $taxonomy, 'slug' => $slug, 'term' => $term];
+        }
+
+        $wp->query_vars['product_cat'] = $cat_slug;
+
+        if ($paged !== null) {
+            $wp->query_vars['paged'] = $paged;
+        }
+
+        foreach ($resolved as $extra) {
+            self::$chain_extra_tax[$extra['taxonomy']][] = $extra['slug'];
+        }
+
+        self::$category_chain_terms = array_merge(
+            [['base' => 'product-category', 'taxonomy' => 'product_cat', 'slug' => $cat_slug, 'term' => $category_term]],
+            $resolved
+        );
     }
 
     private function send_404($wp)
