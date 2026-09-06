@@ -72,13 +72,13 @@ $next_filter_suggestion = !empty($next_filter_active)
 								<?php yoast_breadcrumb('<span id="breadcrumbs">', '</span>'); ?>
 							</div>
 						<?php endif; ?>
-						<?php if ($category_term instanceof WP_Term) : ?>
+						<?php if ($chain_title !== '') : ?>
+							<h1 class="page-header-category-title"><?= esc_html($chain_title) ?></h1>
+						<?php elseif ($category_term instanceof WP_Term) : ?>
 							<h1 class="page-header-category-title"><?= esc_html($category_seo_title) ?></h1>
 							<?php if (! empty($category_seo_description)) : ?>
 								<div class="page-header-category-description"><?= wp_kses_post($category_seo_description) ?></div>
 							<?php endif; ?>
-						<?php elseif ($chain_title !== '') : ?>
-							<h1 class="page-header-category-title"><?= esc_html($chain_title) ?></h1>
 						<?php elseif ($attribute_term instanceof WP_Term) : ?>
 							<h1 class="page-header-category-title"><?= esc_html($attribute_term->name) ?></h1>
 							<?php if (! empty($attribute_description)) : ?>

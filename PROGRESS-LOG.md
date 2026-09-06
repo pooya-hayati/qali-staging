@@ -618,3 +618,22 @@ Deployed via SFTP (paramiko): `App/Controller/Shop.php` only.
 - `debug.log` unchanged: 387,084,368 bytes (checked via SFTP `stat`).
 
 Deployed via SFTP (paramiko): `App/Controller/Shop.php`, `templates/card/card-product.php`, `templates/shop/product-grid.php`.
+
+## 31. Fixed the H1/title not combining with the category on category-chain pages — same class of gap as §30's breadcrumb bug
+
+**Root cause: the same shape as §30, in a third place.** `header-shop.php` builds the H1 by checking `$category_term instanceof WP_Term` *before* `$chain_title !== ''` — and on a category-leading chain page (e.g. `/product-category/colorful-vintage/origin/tabriz/`), `is_tax('product_cat')` is true (the category is the real native queried object, by the same design as §28's rewrite rule), so `$category_term` always won and rendered just the bare category name, never reaching the chain-title branch at all. Compounding it, `Shop::chain_title_text()` (which both the H1 and the `wpseo_title` filter's `chain_title()` read from — so both were broken by the exact same function, confirmed in one pass as the task asked) only ever read `self::$chain_terms` (pure `pa_*` chains), the same array `chain_breadcrumb_links()` was missing before §30 — so even reordering the `if`/`elseif` alone wouldn't have helped, since `$chain_title` was always `''` on a category-chain page regardless.
+
+**Fix, two parts:**
+- `chain_title_text()` now checks `self::$category_chain_terms` first (≥2 entries), falling back to `self::$chain_terms` (≥2 entries) — identical precedence to `chain_breadcrumb_links()`. No other change needed: it already builds the string from each entry's `$entry['term']->name`, and a `category_chain_terms` entry's `term` is a real `WP_Term` (the category itself for the first entry) same as any `pa_*` entry, so "Colorful Vintage" + "Tabriz" + "Blue" + "Rectangle" + "Rugs" falls out with no extra code.
+- `header-shop.php`'s H1 `if`/`elseif` chain reordered so `$chain_title !== ''` is checked *first*, before `$category_term instanceof WP_Term` — a category-chain page now hits the chain branch and never reaches the bare-category branch at all (matching how a pure attribute chain already worked). Deliberately used each entry's plain `->name`, not the category's curated `seo_title` meta override (`Category Title (H1)` in wp-admin) — that field is meant to *replace* a bare category page's entire H1, not be glued as a prefix onto a generated attribute list, so a category with a custom override still gets it on its own bare page but a sensible plain-name-based combined title on a chain page under it.
+- `wpseo_title`'s `chain_title()` needed no separate change — it already just calls `chain_title_text()` and falls back to the default `$title` when empty, so it started returning the combined text automatically once `chain_title_text()` did.
+- The bare-category `seo_description` block (under the H1) still only renders in the `$category_term` branch, so — same as a pure attribute chain already did — a category-chain page shows no description under its combined H1, only the bare category page does. Not a regression: this matches the pre-existing pattern exactly, and combining a curated description with dynamic attribute terms wasn't asked for.
+
+**Verified live (curl):**
+- `/product-category/colorful-vintage/origin/tabriz/`: H1 and `<title>` both now **"Colorful Vintage Tabriz Rugs"** (title tag: "Colorful Vintage Tabriz Rugs - Qali").
+- `/product-category/colorful-vintage/origin/tabriz/color/blue/shape/rectangle/`: **"Colorful Vintage Tabriz Blue Rectangle Rugs"** — category + all 3 filter terms, same order as the URL.
+- `/origin/tabriz/color/red/` (pure attribute chain, no category): unchanged — **"Tabriz Red Rugs"**.
+- `/product-category/colorful-vintage/` (bare category, no chain): unchanged — H1 **"Colorful Vintage"**, `<title>` **"Colorful Vintage Archives - Qali"** (Yoast's own archive-title default, untouched).
+- `debug.log` unchanged: 387,084,368 bytes (checked via SFTP `stat`; no browser-automation tool available this session, so console-error checks weren't repeated — see §29/§30 for the same caveat).
+
+Deployed via SFTP (paramiko): `App/Controller/Shop.php`, `templates/header/header-shop.php`.
