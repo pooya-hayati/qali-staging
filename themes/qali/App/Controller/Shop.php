@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use WP_Query;
 use WP_Error;
+use WP_Term;
 
 class Shop
 {
@@ -58,6 +59,9 @@ class Shop
 
         add_action('wp_ajax_' . 'qali_load_more_products', [$this, 'ajax_load_more_products']);
         add_action('wp_ajax_' . 'nopriv_qali_load_more_products', [$this, 'ajax_load_more_products']);
+
+        add_action('wp_ajax_' . 'qali_next_filter_suggestion', [$this, 'ajax_next_filter_suggestion']);
+        add_action('wp_ajax_' . 'nopriv_qali_next_filter_suggestion', [$this, 'ajax_next_filter_suggestion']);
 
         add_filter('rwmb_meta_boxes', [$this, 'register_meta']);
         add_action('init', [$this, 'remove_product_features']);
@@ -793,6 +797,180 @@ class Shop
      * alongside its existing $_GET-based tax_query — the one shared call site for both.
      */
     public static $chain_extra_tax = [];
+
+    /**
+     * Priority order for the "suggested next filter" chip row (see get_next_filter_suggestion()):
+     * the first dimension in this list NOT already active in the current URL is the one suggested.
+     */
+    const NEXT_FILTER_PRIORITY = ['origin', 'color', 'design', 'shape', 'size', 'material', 'feel', 'thickness'];
+
+    /** Cap on how many candidate-term chips are rendered for the suggested dimension. */
+    const NEXT_FILTER_CHIP_CAP = 12;
+
+    public static function attribute_taxonomies()
+    {
+        return array_values(self::$tax_map);
+    }
+
+    /**
+     * The ordered, path-based attribute filter currently active for this request — a single
+     * native archive term (1 entry, for a plain /origin/tabriz/ page) or a full chain (2+ entries,
+     * from self::$chain_terms, for /origin/tabriz/color/red/). Empty on any other page (product_cat,
+     * shop, non-product pages) — this is what keeps the "next filter" feature out of those.
+     */
+    public static function get_active_path_bases()
+    {
+        if (!empty(self::$chain_terms)) {
+            return self::$chain_terms;
+        }
+
+        if (is_tax(self::attribute_taxonomies())) {
+            $term = get_queried_object();
+            if ($term instanceof WP_Term) {
+                $base = array_search($term->taxonomy, self::$tax_map, true);
+                if ($base !== false) {
+                    return [['base' => $base, 'taxonomy' => $term->taxonomy, 'slug' => $term->slug, 'term' => $term]];
+                }
+            }
+        }
+
+        return [];
+    }
+
+    /**
+     * Computes the "suggested next filter" chip row for a given active path-based filter chain
+     * (single or chained — pass self::get_active_path_bases() for a real page load; the "Skip"
+     * AJAX handler below reconstructs the same shape from what the client sends, since that's a
+     * separate request with no page context of its own, same reason ajax_load_more_products()
+     * needs archive_pa_filters instead of relying on self::$chain_terms): the first not-yet-active
+     * dimension in self::NEXT_FILTER_PRIORITY (skipping any base named in $skip_bases too, for the
+     * "Skip" UI), its candidate terms each counted against $active + that term (reusing
+     * build_filter_query_args()'s tax_query for the $_GET-driven part, same single source of truth
+     * as everywhere else), zero-result terms excluded, capped at self::NEXT_FILTER_CHIP_CAP terms
+     * with the most products first.
+     *
+     * Returns null when $active is empty (product_cat, shop, etc. should pass []), when every
+     * dimension is already active, or — recursing past it — when a dimension turns out to have
+     * zero viable candidates against the current chain at all (rather than showing an empty
+     * suggestion for a dead-end dimension).
+     */
+    public static function get_next_filter_suggestion($active, $skip_bases = [])
+    {
+        if (empty($active)) {
+            return null;
+        }
+
+        $active_bases = array_column($active, 'base');
+        $remaining = array_values(array_diff(self::NEXT_FILTER_PRIORITY, $active_bases, $skip_bases));
+        if (empty($remaining)) {
+            return null;
+        }
+
+        $next_base = $remaining[0];
+        $taxonomy  = self::$tax_map[$next_base];
+
+        $active_clauses = [];
+        foreach ($active as $entry) {
+            $active_clauses[] = ['taxonomy' => $entry['taxonomy'], 'field' => 'slug', 'terms' => [$entry['slug']]];
+        }
+        $extra_args = self::build_filter_query_args();
+        if (!empty($extra_args['tax_query'])) {
+            $active_clauses = array_merge($active_clauses, $extra_args['tax_query']);
+        }
+
+        $terms = get_terms(['taxonomy' => $taxonomy, 'hide_empty' => true]);
+        $candidates = [];
+        if (!is_wp_error($terms)) {
+            foreach ($terms as $term) {
+                $q = new WP_Query([
+                    'post_type'      => 'product',
+                    'posts_per_page' => 1,
+                    'fields'         => 'ids',
+                    'no_found_rows'  => false,
+                    'tax_query'      => array_merge($active_clauses, [
+                        ['taxonomy' => $taxonomy, 'field' => 'slug', 'terms' => [$term->slug]],
+                    ]),
+                ]);
+                if ((int) $q->found_posts > 0) {
+                    $candidates[] = ['term' => $term, 'count' => (int) $q->found_posts];
+                }
+            }
+        }
+
+        if (empty($candidates)) {
+            return self::get_next_filter_suggestion($active, array_merge($skip_bases, [$next_base]));
+        }
+
+        usort($candidates, function ($a, $b) {
+            return $b['count'] <=> $a['count'];
+        });
+        $candidates = array_slice($candidates, 0, self::NEXT_FILTER_CHIP_CAP);
+
+        $path_parts = [];
+        foreach ($active as $entry) {
+            $path_parts[] = $entry['base'];
+            $path_parts[] = $entry['slug'];
+        }
+
+        $chips = [];
+        foreach ($candidates as $c) {
+            $chips[] = [
+                'name'  => $c['term']->name,
+                'count' => $c['count'],
+                'url'   => home_url('/' . implode('/', array_merge($path_parts, [$next_base, $c['term']->slug])) . '/'),
+            ];
+        }
+
+        return [
+            'base'  => $next_base,
+            'label' => wc_attribute_label('pa_' . $next_base),
+            'chips' => $chips,
+        ];
+    }
+
+    /**
+     * AJAX handler for the "Skip" link — returns the next remaining dimension's chip row (or an
+     * empty one if none left, so the client hides the whole block) without changing the page URL.
+     *
+     * This is a plain admin-ajax.php-style request with no page context of its own (same reason
+     * ajax_load_more_products() needs its own archive_pa_filters param) — the page's active path
+     * chain is reconstructed here from the `active` JSON param the client sends (the same one the
+     * initial render exposed via the chip row's own data-active attribute), not from
+     * self::get_active_path_bases()/self::$chain_terms, which only ever reflect a real page load.
+     */
+    public function ajax_next_filter_suggestion()
+    {
+        $skip_raw   = sanitize_text_field($_GET['skip'] ?? '');
+        $skip_bases = array_values(array_filter(array_map('sanitize_key', explode(',', $skip_raw))));
+
+        $active_raw = json_decode(stripslashes((string) ($_GET['active'] ?? '')), true);
+        $active = [];
+        if (is_array($active_raw)) {
+            foreach ($active_raw as $entry) {
+                $base = sanitize_key($entry['base'] ?? '');
+                $slug = sanitize_title($entry['slug'] ?? '');
+                if ($base === '' || $slug === '' || !isset(self::$tax_map[$base])) {
+                    continue;
+                }
+                $taxonomy = self::$tax_map[$base];
+                if (!get_term_by('slug', $slug, $taxonomy)) {
+                    continue;
+                }
+                $active[] = ['base' => $base, 'taxonomy' => $taxonomy, 'slug' => $slug];
+            }
+        }
+
+        $suggestion = self::get_next_filter_suggestion($active, $skip_bases);
+
+        ob_start();
+        get_template_part_var('templates/shop/next-filter-chips.php', ['suggestion' => $suggestion, 'skipped' => $skip_bases, 'active' => $active]);
+        $html = ob_get_clean();
+
+        wp_send_json_success([
+            'html' => $html,
+            'base' => $suggestion['base'] ?? null,
+        ]);
+    }
 
     public static function add_query_vars($vars)
     {

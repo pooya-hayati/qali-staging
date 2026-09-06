@@ -389,3 +389,33 @@ $(function () {
     });
   }
 });
+
+// "Suggested next filter" chips (pa_* archive pages, single-attribute or chained) — "Skip" swaps
+// in the next remaining dimension's row via AJAX, without changing the page URL. Delegated so it
+// keeps working after the row is replaced by a later "Skip" click.
+$(function () {
+  $(document).on('click', '.page-header-next-filter-skip', function (e) {
+    e.preventDefault();
+    const $btn = $(this);
+    const $wrap = $btn.closest('#next-filter-suggestion');
+    const base = $btn.data('base');
+    const skipped = ($wrap.data('skipped') || '').toString().split(',').filter(Boolean);
+    skipped.push(base);
+    // jQuery auto-parses this data attribute's JSON — the page's own active filter chain, since
+    // this AJAX request has no page context of its own (see Shop::ajax_next_filter_suggestion()).
+    const active = $wrap.data('active') || [];
+
+    $btn.prop('disabled', true);
+    $.get(URL_AJAX, { action: 'qali_next_filter_suggestion', skip: skipped.join(','), active: JSON.stringify(active) })
+      .done(function (response) {
+        if (response && response.success && response.data.html) {
+          $wrap.replaceWith(response.data.html);
+        } else {
+          $wrap.remove();
+        }
+      })
+      .fail(function () {
+        $btn.prop('disabled', false);
+      });
+  });
+});

@@ -1655,6 +1655,82 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
   color: var(--color-Black);
 }
 
+/* "Suggested next filter" chips (pa_* archive pages, single-attribute or chained). Pill shape
+   and hover color reuse .page-header-filter-active .filter-tag's / .show-more-btn's own
+   established language (40px pill radius, #780000 -> #ac1f1f on hover) rather than new values. */
+.page-header-next-filter {
+  margin-top: 24px;
+}
+
+.page-header-next-filter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.page-header-next-filter-label {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: normal;
+  letter-spacing: 0px;
+  color: var(--color-Neutral-700);
+  text-transform: uppercase;
+}
+
+.page-header-next-filter-skip {
+  color: var(--color-CarpetRed);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.page-header-next-filter-skip:hover {
+  color: var(--color-Thunderbird);
+}
+
+.page-header-next-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.next-filter-chip {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 14px;
+  height: 32px;
+  background: var(--color-Neutral-50);
+  color: var(--color-Neutral-900);
+  border-radius: 40px;
+  line-height: 1;
+  font-weight: 400;
+  font-size: 14px;
+  text-decoration: none;
+  transition: background-color .2s ease, color .2s ease;
+}
+
+.next-filter-chip:hover {
+  background-color: #780000;
+  color: var(--color-White);
+}
+
+.next-filter-chip-count {
+  opacity: .6;
+}
+
+.next-filter-chip:hover .next-filter-chip-count {
+  opacity: .85;
+}
+
 .range-slider {
   direction: ltr;
 }

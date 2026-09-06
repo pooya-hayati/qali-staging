@@ -495,3 +495,29 @@ Root cause, traced rather than guessed: `Shop::register_chain_rewrite_rule()`'s 
 - `debug.log` size/mtime unchanged (387,084,368 bytes, 2026-08-24 23:28:08) throughout both the pre-fix bug discovery and the post-fix verification.
 
 Deployed via SFTP (paramiko): `App/Controller/Shop.php` only.
+
+## 26. "Suggested next filter" chip row (Nain Trading-style) on pa_* archive pages, single-attribute and chained
+
+New section rendered directly below the existing H1/description block in `header-shop.php`, on any `pa_*` attribute archive page — single-term (e.g. `/origin/tabriz/`) or chained (§23, e.g. `/origin/tabriz/color/red/`) — never on `product_cat` (out of scope per the task); verified live (`/product-category/antique/` has no chip row).
+
+**Priority order implemented, exactly as specified:** `origin → color → design → shape → size → material → feel → thickness` (`Shop::NEXT_FILTER_PRIORITY`). The chip row always suggests the first dimension in this list not already active in the current URL/chain — e.g. `/origin/tabriz/` (only origin active) suggests **Color**; `/origin/tabriz/color/red/` (origin+color active) correctly skips both and suggests **Design**.
+
+**Architecture — no second query builder:** `Shop::get_active_path_bases()` reads the currently-active chain (`Shop::$chain_terms` for a real chain, or the single queried term for a plain single-attribute page — empty everywhere else, which is what keeps this off `product_cat`). `Shop::get_next_filter_suggestion($active, $skip_bases)` finds the first not-yet-active/not-skipped dimension, then for *every* term in that dimension's taxonomy runs one `WP_Query` (`posts_per_page => 1`, reading `found_posts`) against the active chain's tax_query clauses merged with `Shop::build_filter_query_args()`'s own output (the same single tax_query builder §23 already uses for both sidebar `$_GET` filters and chained URLs — no new one written here either).
+
+**Empty-combo exclusion (the critical requirement):** a candidate term is only ever included if its `WP_Query`'s `found_posts > 0` — confirmed live: every chip's displayed count matches its target page's real `found_posts`, and zero chips across `/origin/tabriz/` or the chained page linked to a 0-product combination. If a whole dimension turns out to have zero viable candidates against the current chain (not tested live since none of this dataset's dimensions hit that), `get_next_filter_suggestion()` recurses to the next dimension in priority order rather than rendering an empty section.
+
+**Cap:** results sorted by product count descending, capped at 12 (`Shop::NEXT_FILTER_CHIP_CAP`) — confirmed live on `/origin/tabriz/` → Color (13 real terms, 12 shown, Green(2) the lowest included, correct descending order Beige(65)…Green(2)).
+
+**"Skip" link:** matches the task's Nain Trading reference — a button (not a real link, since it doesn't navigate) that AJAX-fetches the next remaining dimension's row (`Shop::ajax_next_filter_suggestion()`, new `wp_ajax_qali_next_filter_suggestion` action) without changing the page URL, and replaces the row in place. Since an AJAX request has no page context of its own, the client sends back the active chain (`data-active` JSON, written by the same template the initial render uses) and the accumulated skip list — verified live: two successive Skip clicks on `/origin/tabriz/` moved Color → Design → Shape correctly, zero console errors.
+
+**Styling reused, not invented** (per the task's instruction to check `main.css` first): pill shape/sizing and the `#780000` → `#ac1f1f`-family hover color are the same language already established by `.page-header-filter-active .filter-tag` and `.show-more-btn` elsewhere in the theme — no new color values introduced. New rules are additive (`.page-header-next-filter*`, `.next-filter-chip*`), nothing existing was changed.
+
+**Verified live** (Playwright + direct HTTP/SFTP checks, this session):
+- `/origin/tabriz/`: 200, "Narrow by Color" label, Skip button present, 12 chips (Beige 65 → Green 2, correct descending order), all `<a href>` (not `onclick`/JS-only) resolving to `/origin/tabriz/color/{slug}/` — spot-checked 6 of the 12 links directly and each target page's own `data-found-posts` matches the chip's displayed count exactly (Beige 65, Black 40, Pink 23, Red 18, Blue 17, Grey 13).
+- `/origin/tabriz/color/red/`: 200, correctly suggests **Design** (skipping origin+color), 3 real chips (Medallion 13, Modern 3, Afshan 2), all linking to valid 3-way chains (`/origin/tabriz/color/red/design/{slug}/`).
+- Skip button clicked twice live on `/origin/tabriz/`: Color → Design → Shape, each swap correct, zero console/`pageerror` events.
+- `/product-category/antique/`: no `#next-filter-suggestion` element at all — confirms the feature is scoped to `pa_*` pages only, per the task.
+- Mobile viewport (390px), both a single-attribute and a chained page: chips wrap cleanly onto multiple lines, Skip stays right-aligned next to the "Narrow by X" label, no overflow/clipping.
+- Zero new console/`pageerror` events across every page and interaction tested. `debug.log` size unchanged (387,084,368 bytes — identical to the figure recorded in §24/§25) throughout.
+
+Deployed via SFTP (paramiko): `App/Controller/Shop.php`, `assets/css/main.css`, `assets/js/shop.js`, `templates/header/header-shop.php`, `templates/shop/next-filter-chips.php` (new file).

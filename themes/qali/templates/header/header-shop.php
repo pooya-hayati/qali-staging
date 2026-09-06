@@ -39,11 +39,21 @@ if ($category_term instanceof WP_Term) {
  * /origin/tabriz/color/red/) also satisfies is_tax('pa_origin'); the chain's own combined H1
  * (already built) is left as-is, with no per-segment description underneath it.
  */
-$attribute_taxonomies = ['pa_color', 'pa_design', 'pa_feel', 'pa_material', 'pa_origin', 'pa_shape', 'pa_size', 'pa_thickness'];
+$attribute_taxonomies = \App\Controller\Shop::attribute_taxonomies();
 $attribute_term = ($chain_title === '' && is_tax($attribute_taxonomies)) ? get_queried_object() : null;
 $attribute_description = ($attribute_term instanceof WP_Term)
 	? term_description($attribute_term->term_id, $attribute_term->taxonomy)
 	: '';
+
+// "Suggested next filter" chips — any pa_* archive page, single-attribute or chained, never
+// product_cat (both branches above are the only things that ever populate $chain_title or
+// $attribute_term, so gating on those two is exactly "is this a pa_* archive page").
+$next_filter_active = ($chain_title !== '' || $attribute_term instanceof WP_Term)
+	? \App\Controller\Shop::get_active_path_bases()
+	: [];
+$next_filter_suggestion = !empty($next_filter_active)
+	? \App\Controller\Shop::get_next_filter_suggestion($next_filter_active)
+	: null;
 
 ?>
 <header id="page-header">
@@ -74,6 +84,9 @@ $attribute_description = ($attribute_term instanceof WP_Term)
 							<?php if (! empty($attribute_description)) : ?>
 								<div class="page-header-category-description"><?= wp_kses_post($attribute_description) ?></div>
 							<?php endif; ?>
+						<?php endif; ?>
+						<?php if ($next_filter_suggestion) : ?>
+							<?php get_template_part_var('templates/shop/next-filter-chips.php', ['suggestion' => $next_filter_suggestion, 'skipped' => [], 'active' => $next_filter_active]) ?>
 						<?php endif; ?>
 					</div>
 				</div>
