@@ -914,11 +914,21 @@ class Shop
 
         $chips = [];
         foreach ($candidates as $c) {
-            $chips[] = [
+            $chip = [
                 'name'  => $c['term']->name,
                 'count' => $c['count'],
                 'url'   => home_url('/' . implode('/', array_merge($path_parts, [$next_base, $c['term']->slug])) . '/'),
             ];
+
+            if ($next_base === 'color') {
+                $chip['swatch'] = self::color_swatch_for_term($c['term']);
+            } elseif ($next_base === 'shape') {
+                $chip['shape_slug'] = $c['term']->slug;
+            } elseif ($next_base === 'origin') {
+                $chip['thumbnail_url'] = self::origin_chip_thumbnail_url($c['term']);
+            }
+
+            $chips[] = $chip;
         }
 
         return [
@@ -926,6 +936,147 @@ class Shop
             'label' => wc_attribute_label('pa_' . $next_base),
             'chips' => $chips,
         ];
+    }
+
+    /**
+     * Resolves the swatch shown on a color-dimension chip. `pa_color` terms already carry a
+     * curated hex value via the Meta Box "Color" term-meta field (id `color` — the same one the
+     * sidebar color filter's own swatch dots already read, see header-shop.php's `$color_hex`) —
+     * reused as-is when present, never re-guessed. Only a term with no curated value at all falls
+     * through to a name-based guess (flagged via `guessed => true`), so any real gap is easy to
+     * find and fix later by filling in that same Meta Box field.
+     */
+    public static function color_swatch_for_term($term)
+    {
+        $hex = get_term_meta($term->term_id, 'color', true);
+        if ($hex) {
+            return ['hex' => $hex, 'guessed' => false];
+        }
+
+        // "Multicolored" has no single representative hue — a small gradient reads correctly
+        // where a flat guessed color would be actively misleading.
+        if (strpos($term->slug, 'multicolor') !== false) {
+            return [
+                'gradient' => 'conic-gradient(from 0deg, #C0392B, #E1B12C, #27AE60, #2980B9, #8E44AD, #C0392B)',
+                'guessed'  => true,
+            ];
+        }
+
+        $guesses = [
+            'red' => '#C0392B', 'blue' => '#2980B9', 'green' => '#27AE60', 'black' => '#1C1C1C',
+            'white' => '#F6F0E6', 'grey' => '#808080', 'gray' => '#808080', 'brown' => '#8B5E3C',
+            'beige' => '#D8C7A1', 'pink' => '#E8A0BF', 'purple' => '#8E44AD', 'yellow' => '#E1B12C',
+            'orange' => '#D9822B', 'turquoise' => '#3FBFB0', 'olive' => '#7C7A3B', 'navy' => '#1B3358',
+            'cream' => '#F1E7D0', 'gold' => '#C9A24B', 'ivory' => '#F4EEDF', 'charcoal' => '#3A3A3A',
+        ];
+        foreach ($guesses as $needle => $hex_guess) {
+            if (strpos($term->slug, $needle) !== false) {
+                return ['hex' => $hex_guess, 'guessed' => true];
+            }
+        }
+
+        return ['hex' => '#B7A99A', 'guessed' => true];
+    }
+
+    /** Term meta key caching the chosen representative-product thumbnail attachment ID per pa_origin term. */
+    const ORIGIN_THUMB_META_KEY = 'next_filter_thumbnail_id';
+
+    /**
+     * Resolves the circular photo thumbnail shown on an origin-dimension chip. There is no
+     * curated "representative image per origin" field anywhere in this theme (only `pa_design`
+     * has a manually-uploaded term image) — so this auto-selects one from real product data and
+     * caches the chosen attachment ID in term meta, so every origin term's thumbnail is computed
+     * at most once ever (until the cached attachment is deleted), not on every page load.
+     */
+    public static function origin_chip_thumbnail_url($term)
+    {
+        $cached_id = (int) get_term_meta($term->term_id, self::ORIGIN_THUMB_META_KEY, true);
+        if ($cached_id > 0) {
+            $url = wp_get_attachment_image_url($cached_id, 'thumbnail');
+            if ($url) {
+                return $url;
+            }
+        }
+
+        $thumb_id = self::find_representative_product_thumbnail($term->taxonomy, $term->slug);
+        update_term_meta($term->term_id, self::ORIGIN_THUMB_META_KEY, $thumb_id);
+
+        return $thumb_id ? wp_get_attachment_image_url($thumb_id, 'thumbnail') : '';
+    }
+
+    /**
+     * Best-selling product in the term first (`total_sales` postmeta — WP_Query's own
+     * `meta_value_num` ordering requires the meta key to exist, so a term whose products have
+     * never sold legitimately returns zero rows here, not an error); falls back to the term's
+     * most recent product otherwise. Either way, skips forward past any candidate with no
+     * featured image rather than caching a blank thumbnail for the whole term.
+     */
+    private static function find_representative_product_thumbnail($taxonomy, $slug)
+    {
+        $by_sales = new WP_Query([
+            'post_type'      => 'product',
+            'posts_per_page' => 5,
+            'orderby'        => 'meta_value_num',
+            'meta_key'       => 'total_sales',
+            'order'          => 'DESC',
+            'fields'         => 'ids',
+            'no_found_rows'  => true,
+            'tax_query'      => [['taxonomy' => $taxonomy, 'field' => 'slug', 'terms' => [$slug]]],
+        ]);
+        foreach ($by_sales->posts as $post_id) {
+            $thumb_id = get_post_thumbnail_id($post_id);
+            if ($thumb_id) {
+                return (int) $thumb_id;
+            }
+        }
+
+        $by_date = new WP_Query([
+            'post_type'      => 'product',
+            'posts_per_page' => 10,
+            'orderby'        => 'date',
+            'order'          => 'DESC',
+            'fields'         => 'ids',
+            'no_found_rows'  => true,
+            'tax_query'      => [['taxonomy' => $taxonomy, 'field' => 'slug', 'terms' => [$slug]]],
+        ]);
+        foreach ($by_date->posts as $post_id) {
+            $thumb_id = get_post_thumbnail_id($post_id);
+            if ($thumb_id) {
+                return (int) $thumb_id;
+            }
+        }
+
+        return 0;
+    }
+
+    /**
+     * Inline line-art icon for a shape-dimension chip, in the same stroke-based style as this
+     * theme's existing line icons (see assets/img/icon-close.svg: fill="none", stroke-width="2",
+     * round caps/joins) — except `stroke="currentColor"` instead of a hardcoded gray, the one
+     * deviation from that file's convention, needed so CSS can flip the icon to white on the
+     * chip's existing red hover state the same way its text already does. Inlined directly
+     * (this theme otherwise always references icons via `<img src>`) rather than as an uploaded
+     * per-term asset, since the shape set is small, fixed, and known ('rectangle', 'square',
+     * 'runner', 'round', 'oval' — confirmed against the live `pa_shape` terms). An unrecognized
+     * future shape term just renders with no icon rather than a guessed placeholder.
+     */
+    public static function shape_chip_icon_svg($slug)
+    {
+        $shapes = [
+            'rectangle' => '<rect x="4" y="8" width="20" height="12" rx="1.5"/>',
+            'square'    => '<rect x="6" y="6" width="16" height="16" rx="1.5"/>',
+            'runner'    => '<rect x="9" y="3" width="10" height="22" rx="1.5"/>',
+            'round'     => '<circle cx="14" cy="14" r="10"/>',
+            'oval'      => '<ellipse cx="14" cy="14" rx="11" ry="7"/>',
+        ];
+
+        if (!isset($shapes[$slug])) {
+            return '';
+        }
+
+        return '<svg width="16" height="16" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'
+            . $shapes[$slug]
+            . '</svg>';
     }
 
     /**

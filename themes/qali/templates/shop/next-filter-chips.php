@@ -37,6 +37,14 @@ $active_json = wp_json_encode(array_map(function ($entry) {
 	<div class="page-header-next-filter-chips">
 		<?php foreach ($suggestion['chips'] as $chip) : ?>
 			<a href="<?= esc_url($chip['url']) ?>" class="next-filter-chip">
+				<?php if (!empty($chip['swatch'])) : ?>
+					<?php $swatch = $chip['swatch']; ?>
+					<span class="next-filter-chip-swatch" style="background: <?= esc_attr($swatch['gradient'] ?? $swatch['hex']) ?>"></span>
+				<?php elseif (!empty($chip['shape_slug'])) : ?>
+					<span class="next-filter-chip-icon"><?php echo \App\Controller\Shop::shape_chip_icon_svg($chip['shape_slug']); ?></span>
+				<?php elseif (!empty($chip['thumbnail_url'])) : ?>
+					<span class="next-filter-chip-thumb"><img src="<?= esc_url($chip['thumbnail_url']) ?>" alt="" loading="lazy" width="20" height="20"></span>
+				<?php endif; ?>
 				<?= esc_html($chip['name']) ?>
 				<span class="next-filter-chip-count">(<?= esc_html(number_format_i18n($chip['count'])) ?>)</span>
 			</a>
