@@ -991,7 +991,8 @@ class Shop
 
     /**
      * Count of currently active filter-modal dimensions (Price/Size/Color/Design/Origin — the 5
-     * filter-card fields inside header-shop.php's #filter-modal) for the "Filter" button's badge.
+     * rows inside header-shop.php's #filter-modal list→submenu screens) for the "Filter" button's
+     * badge.
      * Deliberately excludes sortby (its own standalone control now, never inside the modal) and
      * any path-based/category filter (surfaced separately as its own pill — see
      * active_path_attribute_terms() — not modal-manageable). Purely a read-only display
@@ -1300,6 +1301,36 @@ class Shop
 
         return '<svg width="20" height="20" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'
             . $shapes[$slug]
+            . '</svg>';
+    }
+
+    /**
+     * Inline line-art icon for a filter-modal dimension ROW (Price/Size/Color/Design/Origin —
+     * see header-shop.php's list→submenu modal), in the exact same stroke-based convention as
+     * shape_chip_icon_svg() above (fill="none", stroke="currentColor", stroke-width 2, round
+     * caps/joins) — reused here rather than a second icon style, and hand-drawn rather than
+     * pulled from assets/img/icon-*.svg since that set is a generic Material-Symbols-style
+     * library (checked first) with nothing that reads as "price range", "ruler", "pattern", or
+     * "origin/place" at a glance. Each is a simple, recognizable abstraction: Price a slider
+     * (line + handle), Size a ruler (bar + ticks), Color three overlapping rings, Design a 2x2
+     * swatch grid, Origin a map pin.
+     */
+    public static function dimension_row_icon_svg($base)
+    {
+        $icons = [
+            'price'  => '<line x1="4" y1="14" x2="24" y2="14"/><circle cx="14" cy="14" r="4"/>',
+            'size'   => '<rect x="4" y="10" width="20" height="8" rx="1"/><line x1="9" y1="10" x2="9" y2="14"/><line x1="14" y1="10" x2="14" y2="18"/><line x1="19" y1="10" x2="19" y2="14"/>',
+            'color'  => '<circle cx="10" cy="10" r="6"/><circle cx="18" cy="10" r="6"/><circle cx="14" cy="17" r="6"/>',
+            'design' => '<rect x="5" y="5" width="7" height="7" rx="1"/><rect x="16" y="5" width="7" height="7" rx="1"/><rect x="5" y="16" width="7" height="7" rx="1"/><rect x="16" y="16" width="7" height="7" rx="1"/>',
+            'origin' => '<path d="M14 4c-3.9 0-7 3.1-7 7 0 5.3 7 13 7 13s7-7.7 7-13c0-3.9-3.1-7-7-7z"/><circle cx="14" cy="11" r="2.5"/>',
+        ];
+
+        if (!isset($icons[$base])) {
+            return '';
+        }
+
+        return '<svg width="20" height="20" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'
+            . $icons[$base]
             . '</svg>';
     }
 

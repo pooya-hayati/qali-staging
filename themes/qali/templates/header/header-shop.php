@@ -78,6 +78,43 @@ $clear_all_url = $any_filter_active ? get_post_type_archive_link('product') : ''
 // Filter-modal badge — Price/Size/Color/Design/Origin only, see Shop::active_modal_filter_count().
 $modal_filter_count = \App\Controller\Shop::active_modal_filter_count();
 
+/**
+ * List→submenu filter modal (this session): the main screen shows one row per dimension with
+ * its currently-selected term's name (or "All") on the right — computed here at page-load time
+ * the same way every other $_GET-driven piece of this template already is; shop.js updates a
+ * row's displayed value client-side afterward, without a reload, when the visitor picks a new
+ * term in that dimension's submenu and taps OK/back.
+ */
+$filter_all_label = __('All', LANG_STRING);
+$current_term_value = function ($param, $terms) use ($filter_all_label) {
+	$slug = $_GET[$param] ?? '';
+	if ($slug === '') {
+		return $filter_all_label;
+	}
+	foreach ($terms as $term) {
+		if ($term->slug === $slug) {
+			return $term->name;
+		}
+	}
+	return $filter_all_label;
+};
+
+$price_is_default = ((float) $min_price_value <= (float) $prices['min_price']) && ((float) $max_price_value >= (float) $prices['max_price']);
+$price_current_value = $price_is_default
+	? $filter_all_label
+	: sprintf('$%s - $%s', number_format_i18n($min_price_value), number_format_i18n($max_price_value));
+
+$filter_dimensions = [
+	['base' => 'price', 'label' => __('Price', LANG_STRING), 'current' => $price_current_value],
+	['base' => 'size', 'label' => __('Size', LANG_STRING), 'current' => $current_term_value('size', $size)],
+	['base' => 'color', 'label' => __('Color', LANG_STRING), 'current' => $current_term_value('color', $color)],
+	['base' => 'design', 'label' => __('Design', LANG_STRING), 'current' => $current_term_value('design', $design)],
+	['base' => 'origin', 'label' => __('Origin', LANG_STRING), 'current' => $current_term_value('origin', $origin)],
+];
+
+// Reused by every submenu's OK button — defined once here rather than repeated 5 times inline.
+$filter_ok_icon_svg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M5 13l4 4L19 7"/></svg>';
+
 ?>
 <header id="page-header">
 	<div class="container-fluid">
@@ -167,181 +204,201 @@ $modal_filter_count = \App\Controller\Shop::active_modal_filter_count();
 
 						<div id="filter-modal" class="filter-modal">
 							<div class="filter-modal-dialog">
-								<div class="filter-modal-header">
-									<h3 class="filter-modal-title"><?= __('Filter', LANG_STRING) ?></h3>
-									<button type="button" class="filter-modal-close" aria-label="<?= esc_attr__('Close', LANG_STRING) ?>"></button>
-								</div>
-								<div class="filter-modal-body">
-									<div class="filter-modal-grid">
-										<div class="filter-card">
-											<div class="filter-card-header">
-												<h3 class="filter-card-title"><?= __('Price', LANG_STRING) ?></h3>
-											</div>
-											<div class="filter-card-body">
-												<div class="range-slider" data-step="10" data-min="<?= $prices['min_price'] ?>" data-max="<?= $prices['max_price'] ?>">
-													<div class="range-slider-track">
-														<div class="range-slider-bar"></div>
-														<div class="range-slider-thumb min-thumb"></div>
-														<div class="range-slider-thumb max-thumb"></div>
-													</div>
-													<div class="range-slider-label">
-														<span class="range-slider-label-min" data-title="<?= __('From', LANG_STRING) ?> $"><?= $prices['min_price'] ?></span>
-														<span class="range-slider-label-max" data-title="<?= __('To', LANG_STRING) ?> $"><?= $prices['max_price'] ?></span>
-													</div>
-													<input type="hidden" class="range-slider-min-original" value="<?= $prices['min_price'] ?>">
-													<input type="hidden" class="range-slider-max-original" value="<?= $prices['max_price'] ?>">
-													<input type="hidden" name="min_price" class="range-slider-min" value="<?= $min_price_value ?>">
-													<input type="hidden" name="max_price" class="range-slider-max" value="<?= $max_price_value ?>">
-												</div>
-											</div>
-										</div>
-										<div class="filter-card">
-											<div class="filter-card-header">
-												<h3 class="filter-card-title"><?= __('Size', LANG_STRING) ?></h3>
-											</div>
-											<div class="filter-card-body">
-												<div class="icon-select">
-													<div class="select-selected">
-														<span><?= __('Please select…', LANG_STRING) ?></span>
-													</div>
-													<div class="select-items">
-														<label>
-															<input type="radio" name="size" value="" <?= !isset($_GET['size']) || $_GET['size'] == '' ? 'checked' : '' ?>>
-															<div>
-																<span><?= __('All', LANG_STRING) ?></span>
-															</div>
-														</label>
-														<?php
-														foreach ($size as $_term):
-															//$checked    = in_array($_term->slug, $active_size) ? 'checked' : '';
-															$checked = (!empty($_GET['size']) && $_GET['size'] === $_term->slug) ? 'checked' : '';
-															$label_cls  = $_term->available ? 'term-label' : 'term-label disabled';
-															$subtitle   = get_term_meta($_term->term_id, 'subtitle', true);
-														?>
-															<label class="<?= esc_attr($label_cls) ?>">
-																<input type="radio" name="size" value="<?= esc_attr($_term->slug) ?>" <?= $checked ?>>
-																<div>
-																	<span><?= esc_html($_term->name) ?></span>
-																	<?php if ($subtitle): ?>
-																		<small><?= esc_html($subtitle) ?></small>
-																	<?php endif; ?>
-																</div>
-															</label>
-														<?php endforeach; ?>
-													</div>
-												</div>
-											</div>
-										</div>
-										<div class="filter-card">
-											<div class="filter-card-header">
-												<h3 class="filter-card-title"><?= __('Color', LANG_STRING) ?></h3>
-											</div>
-											<div class="filter-card-body">
-												<div class="icon-select">
-													<div class="select-selected">
-														<span><?= __('Please select…', LANG_STRING) ?></span>
-													</div>
-													<div class="select-items">
-														<label>
-															<input type="radio" name="color" value="" <?= !isset($_GET['color']) || $_GET['color'] == '' ? '' : 'checked' ?>>
-															<div>
-																<span><?= __('All', LANG_STRING) ?></span>
-															</div>
-														</label>
-														<?php
-														foreach ($color as $_term):
-															//$checked   = in_array($_term->slug, $active_color) ? 'checked' : '';
-															$checked = (!empty($_GET['color']) && $_GET['color'] === $_term->slug) ? 'checked' : '';
-															$label_cls = $_term->available ? 'term-label' : 'term-label disabled';
-															$color_hex = get_term_meta($_term->term_id, 'color', true) ?: '#ffffff';
-														?>
-															<label class="<?= esc_attr($label_cls) ?>">
-																<input type="radio" name="color" value="<?= esc_attr($_term->slug) ?>" <?= $checked ?>>
-																<div>
-																	<i style="background-color: <?= esc_attr($color_hex) ?>"></i>
-																	<span><?= esc_html($_term->name) ?></span>
-																</div>
-															</label>
-														<?php endforeach; ?>
-													</div>
-												</div>
-											</div>
-										</div>
-										<div class="filter-card">
-											<div class="filter-card-header">
-												<h3 class="filter-card-title"><?= __('Design', LANG_STRING) ?></h3>
-											</div>
-											<div class="filter-card-body">
-												<div class="icon-select">
-													<div class="select-selected">
-														<span><?= __('Please select…', LANG_STRING) ?></span>
-													</div>
-													<div class="select-items">
-														<label>
-															<input type="radio" name="design" value="" <?= !isset($_GET['design']) || $_GET['design'] == '' ? '' : 'checked' ?>>
-															<div>
-																<span><?= __('All', LANG_STRING) ?></span>
-															</div>
-														</label>
-														<?php
-														foreach ($design as $_term):
-															//$checked    = in_array($_term->slug, $active_design) ? 'checked' : '';
-															$checked = (!empty($_GET['design']) && $_GET['design'] === $_term->slug) ? 'checked' : '';
-															$label_cls  = $_term->available ? 'term-label' : 'term-label disabled';
-															$image_url  = file_link(get_term_meta($_term->term_id, 'image', true));
-														?>
-															<label class="<?= esc_attr($label_cls) ?>">
-																<input type="radio" name="design" value="<?= esc_attr($_term->slug) ?>" <?= $checked ?>>
-																<div>
-																	<i style="background-image: url('<?= esc_url($image_url) ?>')"></i>
-																	<span><?= esc_html($_term->name) ?></span>
-																</div>
-															</label>
-														<?php endforeach; ?>
-													</div>
-												</div>
-											</div>
-										</div>
-										<div class="filter-card">
-											<div class="filter-card-header">
-												<h3 class="filter-card-title"><?= __('Origin', LANG_STRING) ?></h3>
-											</div>
-											<div class="filter-card-body">
-												<div class="icon-select">
-													<div class="select-selected">
-														<span><?= __('Please select…', LANG_STRING) ?></span>
-													</div>
-													<div class="select-items">
-														<label>
-															<input type="radio" name="origin" value="" <?= !isset($_GET['origin']) || $_GET['origin'] == '' ? '' : 'checked' ?>>
-															<div>
-																<span><?= __('All', LANG_STRING) ?></span>
-															</div>
-														</label>
-														<?php
-														foreach ($origin as $_term):
-															//$checked   = in_array($_term->slug, $active_origin) ? 'checked' : '';
-															$checked = (!empty($_GET['origin']) && $_GET['origin'] === $_term->slug) ? 'checked' : '';
-															$label_cls = $_term->available ? 'term-label' : 'term-label disabled';
-														?>
-															<label class="<?= esc_attr($label_cls) ?>">
-																<input type="radio" name="origin" value="<?= esc_attr($_term->slug) ?>" <?= $checked ?>>
-																<div>
-																	<span><?= esc_html($_term->name) ?></span>
-																</div>
-															</label>
-														<?php endforeach; ?>
-													</div>
-												</div>
-											</div>
+
+								<!-- MAIN SCREEN: one row per dimension, current value + chevron on the right. -->
+								<div class="filter-modal-screen filter-list active" data-screen="list">
+									<div class="filter-modal-header">
+										<h3 class="filter-modal-title"><?= __('Filter', LANG_STRING) ?></h3>
+										<button type="button" class="filter-modal-close" aria-label="<?= esc_attr__('Close', LANG_STRING) ?>"></button>
+									</div>
+									<div class="filter-modal-body">
+										<div class="filter-list-rows">
+											<?php foreach ($filter_dimensions as $dim) : ?>
+												<button type="button" class="filter-list-row" data-dimension="<?= esc_attr($dim['base']) ?>">
+													<span class="filter-list-row-icon"><?php echo \App\Controller\Shop::dimension_row_icon_svg($dim['base']); ?></span>
+													<span class="filter-list-row-label"><?= esc_html($dim['label']) ?></span>
+													<span class="filter-list-row-value"><?= esc_html($dim['current']) ?></span>
+													<img class="filter-list-row-chevron" src="<?= URL_ASSETS ?>/img/icon-arrow-chevron.svg" alt="" width="20" height="20">
+												</button>
+											<?php endforeach; ?>
 										</div>
 									</div>
+									<div class="filter-modal-footer">
+										<button type="submit" class="button button-fill-primary button-block filter-modal-apply">
+											<?= sprintf(esc_html__('Show %s Results', LANG_STRING), number_format_i18n($result_count)) ?>
+										</button>
+									</div>
 								</div>
-								<div class="filter-modal-footer">
-									<button type="button" class="button button-fill-primary button-block filter-modal-apply">
-										<?= sprintf(esc_html__('Show %s results', LANG_STRING), number_format_i18n($result_count)) ?>
-									</button>
+
+								<!-- PRICE submenu: same range-slider markup as before, just relocated behind its own row. -->
+								<div class="filter-modal-screen filter-submenu" data-screen="submenu" data-dimension="price" data-all-label="<?= esc_attr($filter_all_label) ?>">
+									<div class="filter-modal-header filter-modal-header-submenu">
+										<button type="button" class="filter-submenu-back" aria-label="<?= esc_attr__('Back', LANG_STRING) ?>">
+											<img src="<?= URL_ASSETS ?>/img/icon-arrow.svg" alt="" width="20" height="20">
+										</button>
+										<span class="filter-submenu-heading-icon"><?php echo \App\Controller\Shop::dimension_row_icon_svg('price'); ?></span>
+										<h3 class="filter-modal-title"><?= __('Price', LANG_STRING) ?></h3>
+									</div>
+									<div class="filter-modal-body">
+										<div class="range-slider" data-step="10" data-min="<?= $prices['min_price'] ?>" data-max="<?= $prices['max_price'] ?>">
+											<div class="range-slider-track">
+												<div class="range-slider-bar"></div>
+												<div class="range-slider-thumb min-thumb"></div>
+												<div class="range-slider-thumb max-thumb"></div>
+											</div>
+											<div class="range-slider-label">
+												<span class="range-slider-label-min" data-title="<?= __('From', LANG_STRING) ?> $"><?= $prices['min_price'] ?></span>
+												<span class="range-slider-label-max" data-title="<?= __('To', LANG_STRING) ?> $"><?= $prices['max_price'] ?></span>
+											</div>
+											<input type="hidden" class="range-slider-min-original" value="<?= $prices['min_price'] ?>">
+											<input type="hidden" class="range-slider-max-original" value="<?= $prices['max_price'] ?>">
+											<input type="hidden" name="min_price" class="range-slider-min" value="<?= $min_price_value ?>">
+											<input type="hidden" name="max_price" class="range-slider-max" value="<?= $max_price_value ?>">
+										</div>
+									</div>
+									<div class="filter-modal-footer">
+										<button type="button" class="button button-outline-primary button-block filter-submenu-ok"><?php echo $filter_ok_icon_svg; ?> <?= __('OK', LANG_STRING) ?></button>
+									</div>
 								</div>
+
+								<!-- SIZE submenu: plain-text term rows (no swatch/icon), single-select radio. -->
+								<div class="filter-modal-screen filter-submenu" data-screen="submenu" data-dimension="size">
+									<div class="filter-modal-header filter-modal-header-submenu">
+										<button type="button" class="filter-submenu-back" aria-label="<?= esc_attr__('Back', LANG_STRING) ?>">
+											<img src="<?= URL_ASSETS ?>/img/icon-arrow.svg" alt="" width="20" height="20">
+										</button>
+										<span class="filter-submenu-heading-icon"><?php echo \App\Controller\Shop::dimension_row_icon_svg('size'); ?></span>
+										<h3 class="filter-modal-title"><?= __('Size', LANG_STRING) ?></h3>
+									</div>
+									<div class="filter-modal-body">
+										<div class="filter-submenu-rows">
+											<label class="filter-submenu-row">
+												<input type="radio" name="size" value="" <?= !isset($_GET['size']) || $_GET['size'] == '' ? 'checked' : '' ?>>
+												<span class="filter-submenu-row-name"><?= esc_html($filter_all_label) ?></span>
+											</label>
+											<?php
+											foreach ($size as $_term):
+												$checked    = (!empty($_GET['size']) && $_GET['size'] === $_term->slug) ? 'checked' : '';
+												$label_cls  = $_term->available ? 'term-label' : 'term-label disabled';
+												$subtitle   = get_term_meta($_term->term_id, 'subtitle', true);
+											?>
+												<label class="filter-submenu-row <?= esc_attr($label_cls) ?>">
+													<input type="radio" name="size" value="<?= esc_attr($_term->slug) ?>" <?= $checked ?>>
+													<span class="filter-submenu-row-name">
+														<?= esc_html($_term->name) ?>
+														<?php if ($subtitle): ?>
+															<small><?= esc_html($subtitle) ?></small>
+														<?php endif; ?>
+													</span>
+												</label>
+											<?php endforeach; ?>
+										</div>
+									</div>
+									<div class="filter-modal-footer">
+										<button type="button" class="button button-outline-primary button-block filter-submenu-ok"><?php echo $filter_ok_icon_svg; ?> <?= __('OK', LANG_STRING) ?></button>
+									</div>
+								</div>
+
+								<!-- COLOR submenu: swatch (existing per-term color meta, same source as chip swatches) + name. -->
+								<div class="filter-modal-screen filter-submenu" data-screen="submenu" data-dimension="color">
+									<div class="filter-modal-header filter-modal-header-submenu">
+										<button type="button" class="filter-submenu-back" aria-label="<?= esc_attr__('Back', LANG_STRING) ?>">
+											<img src="<?= URL_ASSETS ?>/img/icon-arrow.svg" alt="" width="20" height="20">
+										</button>
+										<span class="filter-submenu-heading-icon"><?php echo \App\Controller\Shop::dimension_row_icon_svg('color'); ?></span>
+										<h3 class="filter-modal-title"><?= __('Color', LANG_STRING) ?></h3>
+									</div>
+									<div class="filter-modal-body">
+										<div class="filter-submenu-rows">
+											<label class="filter-submenu-row">
+												<input type="radio" name="color" value="" <?= !isset($_GET['color']) || $_GET['color'] == '' ? 'checked' : '' ?>>
+												<span class="filter-submenu-row-name"><?= esc_html($filter_all_label) ?></span>
+											</label>
+											<?php
+											foreach ($color as $_term):
+												$checked   = (!empty($_GET['color']) && $_GET['color'] === $_term->slug) ? 'checked' : '';
+												$label_cls = $_term->available ? 'term-label' : 'term-label disabled';
+												$color_hex = get_term_meta($_term->term_id, 'color', true) ?: '#ffffff';
+											?>
+												<label class="filter-submenu-row <?= esc_attr($label_cls) ?>">
+													<input type="radio" name="color" value="<?= esc_attr($_term->slug) ?>" <?= $checked ?>>
+													<span class="filter-submenu-row-swatch" style="background-color: <?= esc_attr($color_hex) ?>"></span>
+													<span class="filter-submenu-row-name"><?= esc_html($_term->name) ?></span>
+												</label>
+											<?php endforeach; ?>
+										</div>
+									</div>
+									<div class="filter-modal-footer">
+										<button type="button" class="button button-outline-primary button-block filter-submenu-ok"><?php echo $filter_ok_icon_svg; ?> <?= __('OK', LANG_STRING) ?></button>
+									</div>
+								</div>
+
+								<!-- DESIGN submenu: per-term uploaded image (existing meta) as the row icon + name. -->
+								<div class="filter-modal-screen filter-submenu" data-screen="submenu" data-dimension="design">
+									<div class="filter-modal-header filter-modal-header-submenu">
+										<button type="button" class="filter-submenu-back" aria-label="<?= esc_attr__('Back', LANG_STRING) ?>">
+											<img src="<?= URL_ASSETS ?>/img/icon-arrow.svg" alt="" width="20" height="20">
+										</button>
+										<span class="filter-submenu-heading-icon"><?php echo \App\Controller\Shop::dimension_row_icon_svg('design'); ?></span>
+										<h3 class="filter-modal-title"><?= __('Design', LANG_STRING) ?></h3>
+									</div>
+									<div class="filter-modal-body">
+										<div class="filter-submenu-rows">
+											<label class="filter-submenu-row">
+												<input type="radio" name="design" value="" <?= !isset($_GET['design']) || $_GET['design'] == '' ? 'checked' : '' ?>>
+												<span class="filter-submenu-row-name"><?= esc_html($filter_all_label) ?></span>
+											</label>
+											<?php
+											foreach ($design as $_term):
+												$checked    = (!empty($_GET['design']) && $_GET['design'] === $_term->slug) ? 'checked' : '';
+												$label_cls  = $_term->available ? 'term-label' : 'term-label disabled';
+												$image_url  = file_link(get_term_meta($_term->term_id, 'image', true));
+											?>
+												<label class="filter-submenu-row <?= esc_attr($label_cls) ?>">
+													<input type="radio" name="design" value="<?= esc_attr($_term->slug) ?>" <?= $checked ?>>
+													<span class="filter-submenu-row-swatch filter-submenu-row-swatch-image" style="background-image: url('<?= esc_url($image_url) ?>')"></span>
+													<span class="filter-submenu-row-name"><?= esc_html($_term->name) ?></span>
+												</label>
+											<?php endforeach; ?>
+										</div>
+									</div>
+									<div class="filter-modal-footer">
+										<button type="button" class="button button-outline-primary button-block filter-submenu-ok"><?php echo $filter_ok_icon_svg; ?> <?= __('OK', LANG_STRING) ?></button>
+									</div>
+								</div>
+
+								<!-- ORIGIN submenu: plain-text term rows, per explicit task direction. -->
+								<div class="filter-modal-screen filter-submenu" data-screen="submenu" data-dimension="origin">
+									<div class="filter-modal-header filter-modal-header-submenu">
+										<button type="button" class="filter-submenu-back" aria-label="<?= esc_attr__('Back', LANG_STRING) ?>">
+											<img src="<?= URL_ASSETS ?>/img/icon-arrow.svg" alt="" width="20" height="20">
+										</button>
+										<span class="filter-submenu-heading-icon"><?php echo \App\Controller\Shop::dimension_row_icon_svg('origin'); ?></span>
+										<h3 class="filter-modal-title"><?= __('Origin', LANG_STRING) ?></h3>
+									</div>
+									<div class="filter-modal-body">
+										<div class="filter-submenu-rows">
+											<label class="filter-submenu-row">
+												<input type="radio" name="origin" value="" <?= !isset($_GET['origin']) || $_GET['origin'] == '' ? 'checked' : '' ?>>
+												<span class="filter-submenu-row-name"><?= esc_html($filter_all_label) ?></span>
+											</label>
+											<?php
+											foreach ($origin as $_term):
+												$checked   = (!empty($_GET['origin']) && $_GET['origin'] === $_term->slug) ? 'checked' : '';
+												$label_cls = $_term->available ? 'term-label' : 'term-label disabled';
+											?>
+												<label class="filter-submenu-row <?= esc_attr($label_cls) ?>">
+													<input type="radio" name="origin" value="<?= esc_attr($_term->slug) ?>" <?= $checked ?>>
+													<span class="filter-submenu-row-name"><?= esc_html($_term->name) ?></span>
+												</label>
+											<?php endforeach; ?>
+										</div>
+									</div>
+									<div class="filter-modal-footer">
+										<button type="button" class="button button-outline-primary button-block filter-submenu-ok"><?php echo $filter_ok_icon_svg; ?> <?= __('OK', LANG_STRING) ?></button>
+									</div>
+								</div>
+
 							</div>
 						</div>
 					</form>

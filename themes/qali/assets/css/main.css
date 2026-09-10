@@ -1565,26 +1565,6 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
   margin-top: 60px;
 }
 
-.filter-card-header {
-  padding-bottom: 12px;
-  text-align: start;
-}
-
-.filter-tag-title,
-.filter-card-title {
-  font-size: 14px;
-  font-weight: 500;
-  line-height: normal;
-  letter-spacing: 0px;
-  color: var(--color-Neutral-700);
-  text-transform: uppercase;
-  margin: 0;
-}
-
-.filter-card-body {
-  border-top: 1px solid var(--color-Neutral-1000);
-}
-
 .filter-text {
   width: 100%;
   padding: 12px 4px;
@@ -1657,11 +1637,12 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
 
 /* Consolidated filter bar (result count + active pills + Clear all on the left, standalone Sort
    + the "Filter" button on the right) — replaces the old always-inline Price/Size/Color/Design/
-   Origin/Sort grid; those 5 filter-cards (Sort excluded, now standalone) move into #filter-modal
-   below, unchanged internally. Every rule here is written with flexbox/grid + logical (inset-
-   inline-*) properties rather than left/right, so it mirrors correctly under dir="rtl" with no
-   separate main.rtl.css override needed — confirmed, not just assumed, against every declaration
-   below before treating main.rtl.css as untouched for this task. */
+   Origin/Sort grid; those 5 dimensions (Sort excluded, now standalone) moved into #filter-modal
+   below (originally as cards, since restructured again into the list→submenu pattern — see the
+   .filter-modal-screen rules further down). Every rule here is written with flexbox/grid + logical
+   (inset-inline-*) properties rather than left/right, so it mirrors correctly under dir="rtl"
+   with no separate main.rtl.css override needed — confirmed, not just assumed, against every
+   declaration below before treating main.rtl.css as untouched for this task. */
 .page-header-filter-bar {
   display: flex;
   align-items: center;
@@ -1752,10 +1733,12 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
   display: flex;
 }
 
+/* Narrower than the old 2-column card grid's 720px — a single-column row list (both the main
+   list and every submenu) reads better as a compact app-like panel than a wide sheet. */
 .filter-modal-dialog {
   background: var(--color-White);
   width: 100%;
-  max-width: 720px;
+  max-width: 440px;
   max-height: 85vh;
   border-radius: 12px;
   display: flex;
@@ -1792,31 +1775,201 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
 }
 
 .filter-modal-body {
-  padding: 24px;
+  padding: 8px 24px 24px;
   overflow-y: auto;
   flex: 1;
-}
-
-.filter-modal-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 24px 20px;
-}
-
-/* The grid's last card (Origin, alone in the final row on both the 2-column desktop layout and
-   the 1-column mobile stack — see the max-width:767.98px override below) sits directly against
-   .filter-modal-body's scrollable bottom edge, so its dropdown would otherwise get clipped by
-   that overflow instead of overlaying the cards above it. Flipping just this one dropdown upward
-   is a smaller, more targeted fix than restructuring the grid or the scroll container. */
-.filter-modal-grid .filter-card:last-child .select-items {
-  top: auto;
-  bottom: calc(100% + 4px);
 }
 
 .filter-modal-footer {
   padding: 16px 24px;
   border-top: var(--border);
   flex-shrink: 0;
+}
+
+/* One screen at a time inside the dialog: the main list (default) or one dimension's submenu.
+   Switching screens (shop.js) just toggles which sibling carries .active — see header-shop.php
+   for why each screen owns a full header+body+footer trio instead of one shared, content-
+   swapping header/footer, matching the task's "list screen" vs "submenu screen" as two distinct
+   views rather than one view with a mutating header. */
+.filter-modal-screen {
+  display: none;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.filter-modal-screen.active {
+  display: flex;
+}
+
+/* Submenu header: back arrow + dimension icon + heading, left-aligned in sequence — replaces the
+   list screen's title+close (space-between) layout for this variant. */
+.filter-modal-header-submenu {
+  justify-content: flex-start;
+  gap: 12px;
+}
+
+.filter-submenu-back {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* icon-arrow.svg points right (reused as-is for the main list's own "next filter" chip links
+   elsewhere) — flipped here to read as "back" in LTR. main.rtl.css un-flips it, since "back"
+   points the other physical way once the reading direction itself reverses. */
+.filter-submenu-back img {
+  transform: scaleX(-1);
+}
+
+.filter-submenu-heading-icon {
+  display: inline-flex;
+  color: var(--color-Neutral-1000);
+  flex-shrink: 0;
+}
+
+/* Main screen: one row per dimension. */
+.filter-list-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.filter-list-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 16px 0;
+  background: none;
+  border: none;
+  border-bottom: var(--border);
+  text-align: start;
+  cursor: pointer;
+  font: inherit;
+}
+
+.filter-list-rows .filter-list-row:last-child {
+  border-bottom: none;
+}
+
+.filter-list-row-icon {
+  display: inline-flex;
+  color: var(--color-Neutral-700);
+  flex-shrink: 0;
+}
+
+.filter-list-row-label {
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0px;
+  color: var(--color-Neutral-700);
+  text-transform: uppercase;
+}
+
+.filter-list-row-value {
+  margin-inline-start: auto;
+  font-size: 14px;
+  color: var(--color-Neutral-500);
+  text-align: end;
+}
+
+.filter-list-row-chevron {
+  flex-shrink: 0;
+  opacity: .4;
+}
+
+/* Submenu screen: one row per term — swatch/image (Color/Design) or plain text (Size/Origin), an
+   invisible native radio driving the actual selection/state (same [name]/[value] pairs the rest
+   of the filter system already reads — see build_filter_query_args(), untouched), and a checkmark
+   revealed on the checked row via :has() rather than a second JS-driven "selected" class. */
+.filter-submenu-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.filter-submenu-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 0;
+  border-bottom: var(--border);
+  cursor: pointer;
+  position: relative;
+}
+
+.filter-submenu-rows .filter-submenu-row:last-child {
+  border-bottom: none;
+}
+
+.filter-submenu-row input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.filter-submenu-row-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1px solid var(--color-Neutral-200);
+  background-size: cover;
+  background-position: center;
+}
+
+.filter-submenu-row-swatch-image {
+  border-radius: 6px;
+}
+
+.filter-submenu-row-name {
+  font-size: 15px;
+  color: var(--color-Neutral-1000);
+}
+
+.filter-submenu-row-name small {
+  display: block;
+  font-size: 12px;
+  color: var(--color-Neutral-500);
+}
+
+.filter-submenu-row.disabled {
+  opacity: .4;
+  pointer-events: none;
+}
+
+.filter-submenu-row:has(input:checked) .filter-submenu-row-name {
+  color: var(--color-CarpetRed);
+  font-weight: 500;
+}
+
+/* Small checkmark on the checked row, same CarpetRed as its own selected-state text. No existing
+   asset is a checkmark shape (checked earlier), so this masks a hand-drawn one — same stroke-
+   based convention as Shop::dimension_row_icon_svg()'s PHP-inlined icons, done in CSS here since
+   it's a fixed, non-per-term glyph with nothing to parameterize. */
+.filter-submenu-row:has(input:checked)::after {
+  content: "";
+  margin-inline-start: auto;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  background-color: var(--color-CarpetRed);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 13l4 4L19 7'/%3E%3C/svg%3E") no-repeat center / contain;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 13l4 4L19 7'/%3E%3C/svg%3E") no-repeat center / contain;
+}
+
+.filter-submenu-ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 @media (max-width: 767.98px) {
@@ -1829,10 +1982,6 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
     max-height: 100dvh;
     height: 100dvh;
     border-radius: 0;
-  }
-
-  .filter-modal-grid {
-    grid-template-columns: 1fr;
   }
 
   .page-header-filter-controls {

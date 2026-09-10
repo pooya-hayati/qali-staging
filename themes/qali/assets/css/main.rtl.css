@@ -1109,17 +1109,11 @@ body.nav-open .user-nav > li.nav-toggle > button:nth-child(1) {
 .page-filter {
   margin-bottom: 15px;
 }
-.filter-card-header {
-  padding-bottom: 12px;
-}
-.filter-card-title {
-  font-size: 14px;
-  font-weight: 500;
-  line-height: normal;
-  letter-spacing: 0em;
-  color: #5a5852;
-  text-transform: uppercase;
-  margin: 0;
+/* icon-arrow.svg is flipped (scaleX(-1)) in main.css so it reads as "back" for the filter
+   modal's submenu screens in LTR — un-flip it here so it points the other physical way, which is
+   "back" once the reading direction itself reverses (see main.css's .filter-submenu-back img). */
+.filter-submenu-back img {
+  transform: none;
 }
 .product-sidebar-footer {
   padding-top: 30px;

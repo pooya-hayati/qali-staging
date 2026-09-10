@@ -52,6 +52,17 @@ if (document.documentElement.lang.toLowerCase() === "en-us") {
   function bindFilterChange(name) {
     $(document).on('change', `[name="${name}"]`, function () {
       const input = $(this);
+
+      // Inputs inside the filter modal (Size/Color/Design/Origin — see the list→submenu markup
+      // in header-shop.php) are staged, not applied immediately: picking a term just updates that
+      // radio's checked state and, via the submenu's own OK/back handlers below, the main list
+      // row's displayed value — the actual navigation only happens once, on "Show Results"
+      // (#filter-form's native submit, already handled further down). Sort's own control lives
+      // outside the modal and is unaffected, so it keeps navigating immediately as before.
+      if (input.closest('#filter-modal').length) {
+        return;
+      }
+
       const isCheckbox = input.is(':checkbox');
       const isRadio = input.is(':radio');
 
@@ -82,6 +93,11 @@ if (document.documentElement.lang.toLowerCase() === "en-us") {
     let dragTimeout;
 
     const applyRangeFilter = () => {
+      // Same staging as bindFilterChange() above — the price submenu (inside #filter-modal) only
+      // navigates via "Show Results", not on drag-release.
+      if (slider.closest('#filter-modal').length) {
+        return;
+      }
       const min = minInput.val();
       const max = maxInput.val();
       window.location.href = getUpdatedParams({ min_price: min, max_price: max });
@@ -238,7 +254,21 @@ $(document).ready(function () {
   // Filter modal — same show/hide + dynamically-inserted .body-overlay + body-class pattern as
   // the search bar (see main.js's .search-toggle/.searchbar handlers) and the main nav's #sidebar,
   // reused here rather than building a new overlay mechanism from scratch.
+  function showFilterListScreen() {
+    $("#filter-modal .filter-modal-screen").removeClass("active");
+    $("#filter-modal .filter-list").addClass("active");
+  }
+
+  function closeFilterModal() {
+    $(".filter-modal-overlay").remove();
+    $("#filter-modal").removeClass("active");
+    $("body").removeClass("filter-modal-opened body-overflow");
+  }
+
   $(document).on("click", "body:not(.filter-modal-opened) .filter-modal-toggle", function () {
+    // Always reopen on the main list, regardless of which submenu (if any) was last showing —
+    // predictable re-entry rather than picking up wherever a previous visit left off.
+    showFilterListScreen();
     $("#filter-modal").addClass("active");
     $("#filter-modal").before("<div class='body-overlay filter-modal-overlay'></div>");
     $("body").addClass("filter-modal-opened body-overflow");
@@ -247,19 +277,57 @@ $(document).ready(function () {
   $(document).on(
     "click",
     "body.filter-modal-opened .filter-modal-overlay, body.filter-modal-opened .filter-modal-close, body.filter-modal-opened .filter-modal-apply",
-    function () {
-      $(".filter-modal-overlay").remove();
-      $("#filter-modal").removeClass("active");
-      $("body").removeClass("filter-modal-opened body-overflow");
-    }
+    closeFilterModal
   );
 
   $(document).on("keydown", function (e) {
     if (e.key === "Escape" && $("body").hasClass("filter-modal-opened")) {
-      $(".filter-modal-overlay").remove();
-      $("#filter-modal").removeClass("active");
-      $("body").removeClass("filter-modal-opened body-overflow");
+      closeFilterModal();
     }
+  });
+
+  /**
+   * List→submenu navigation inside the filter modal (Price/Size/Color/Design/Origin — see
+   * header-shop.php). Tapping a main-list row opens that dimension's submenu screen; its own
+   * back-arrow and "OK" button both do the same thing on the way out — read whichever term is
+   * currently checked (native radio-group state, already updated by a plain tap/click on a
+   * submenu row — no separate "select" step needed) or the price slider's current values, write
+   * that as the main row's displayed value, and switch back to the list screen. Neither ever
+   * navigates the page — that only happens once, via the list screen's own "Show Results" submit
+   * button (#filter-form's existing submit handler, untouched) — so picking terms across several
+   * dimensions stages them all before anything is actually applied.
+   */
+  $(document).on("click", ".filter-list-row", function () {
+    const dimension = $(this).data("dimension");
+    $("#filter-modal .filter-modal-screen").removeClass("active");
+    $(`#filter-modal .filter-submenu[data-dimension="${dimension}"]`).addClass("active");
+  });
+
+  $(document).on("click", ".filter-submenu-back, .filter-submenu-ok", function () {
+    const $submenu = $(this).closest(".filter-submenu");
+    const dimension = $submenu.data("dimension");
+    let displayValue;
+
+    if (dimension === "price") {
+      const $slider = $submenu.find(".range-slider");
+      const min = Number($submenu.find(".range-slider-min").val());
+      const max = Number($submenu.find(".range-slider-max").val());
+      const fullMin = Number($slider.data("min"));
+      const fullMax = Number($slider.data("max"));
+      displayValue = (min <= fullMin && max >= fullMax)
+        ? $submenu.data("all-label")
+        : `$${min.toLocaleString()} - $${max.toLocaleString()}`;
+    } else {
+      // .clone().children().remove().end() strips a size row's nested subtitle <small> (if any)
+      // before reading the text, so the main list only ever shows the term's own name.
+      const $checked = $submenu.find("input:checked");
+      displayValue = $checked.length
+        ? $checked.closest(".filter-submenu-row").find(".filter-submenu-row-name").clone().children().remove().end().text().trim()
+        : "";
+    }
+
+    $(`.filter-list-row[data-dimension="${dimension}"] .filter-list-row-value`).text(displayValue);
+    showFilterListScreen();
   });
 
 });
