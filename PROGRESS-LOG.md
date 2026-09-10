@@ -663,3 +663,23 @@ Deployed via SFTP (paramiko): `App/Controller/Shop.php`, `templates/header/heade
 - `debug.log`: unchanged at 387,084,368 bytes across all of the above requests (checked via SFTP `stat` before and after).
 
 Deployed via SFTP (paramiko): `App/Controller/Shop.php` only.
+
+## 33. Gated chip suggestions on a valid fixed-order prefix, not just "any not-yet-active dimension"
+
+**Problem:** `get_next_filter_suggestion()` only ever checked which of `origin`/`color`/`shape` were *not yet* active (`array_diff` against `NEXT_FILTER_PRIORITY`) and suggested the first missing one — it never checked whether the ones that *were* active actually led up to that point in sequence. So `/color/black/` (a valid, functional native single-attribute archive — `color` alone, `origin` never touched) still computed `origin` as "missing" and rendered an "Narrow by Origin" chip row whose links (per §32) correctly pointed at `/origin/{term}/color/black/` — a different, differently-ordered URL than the one the visitor is actually on, i.e. a chip that doesn't *extend* the current page at all. Same for `/shape/rectangle/` alone, or a legally-resolvable but sequence-skipping chain like `/origin/tabriz/shape/rectangle/` (valid under §32's order enforcement — its two segments are already in relative `CHAIN_DIMENSION_ORDER`, just not adjacent — but `color`, the actual next step, was never filled).
+
+**Fix, in `get_next_filter_suggestion()`:** added a prefix-validity check right after the existing empty-`$active` guard, before anything else runs. Filters `$active`'s bases down to just the ones in `NEXT_FILTER_PRIORITY` (`array_intersect`, which also normalizes their order to match `NEXT_FILTER_PRIORITY`'s), then requires that filtered list to equal `array_slice(NEXT_FILTER_PRIORITY, 0, count(...))` exactly — i.e. a contiguous run starting at `origin`, no gaps. Anything else (empty prefix-list mismatch) returns `null` immediately, same as the existing "every dimension already active" early-return, so the chip row doesn't render at all rather than rendering empty.
+- A leading `product_cat` segment is excluded from this 3-element sequence entirely (it's filtered out by the `array_intersect` since `'product-category'` isn't in `NEXT_FILTER_PRIORITY`) — a bare category page with zero `pa_*` actives yet still has an empty (trivially valid) prefix and keeps suggesting `origin`, unchanged from before.
+- Design/material/feel/thickness — already excluded from `NEXT_FILTER_PRIORITY` itself since an earlier session — are likewise invisible to this check; only origin/color/shape actives matter for prefix-validity, matching the task's own framing of "the fixed order sequence (origin → color → shape)" as a 3-element sequence, not all 8 dimensions.
+- No changes needed anywhere else: the "Skip" AJAX handler (`ajax_next_filter_suggestion()`) and the direct page-load call site (`header-shop.php`) both already route through this same function, so both inherit the gate for free.
+
+**Verified live (curl):**
+- `/origin/tabriz/` → chip row present, "Narrow by Color" (valid 1-deep prefix, unchanged from before).
+- `/origin/tabriz/color/black/` → chip row present, "Narrow by Shape" (valid 2-deep prefix, unchanged from before).
+- `/product-category/colorful-vintage/` → chip row present, "Narrow by Origin" (category-led, existing behavior preserved).
+- `/color/black/` → **zero** `page-header-next-filter` elements in the response (previously rendered a full "Narrow by Origin" row).
+- `/shape/rectangle/` → **zero** `page-header-next-filter` elements.
+- `/origin/tabriz/shape/rectangle/` (a legally-resolvable, order-enforcement-compliant chain that skips `color`) → confirmed `200` and **zero** chip elements, validating the gap-skipping case beyond what was explicitly asked.
+- `debug.log`: unchanged at 387,084,368 bytes, checked via SFTP `stat` immediately before and after every request above.
+
+Deployed via SFTP (paramiko): `App/Controller/Shop.php` only.

@@ -947,10 +947,12 @@ class Shop
      * with the most products first.
      *
      * Returns null when $active is empty (product_cat, shop, etc. should pass []), when every
-     * dimension is already active, or — recursing past it — when a dimension turns out to have
-     * fewer than 2 viable candidates against the current chain (zero is a dead end same as
-     * before; exactly 1 is now treated the same way, since a lone chip with no alternative gives
-     * the visitor no real choice and isn't useful navigation).
+     * dimension is already active, when $active's origin/color/shape segments aren't a valid
+     * contiguous prefix of self::NEXT_FILTER_PRIORITY (see the prefix check below), or — recursing
+     * past it — when a dimension turns out to have fewer than 2 viable candidates against the
+     * current chain (zero is a dead end same as before; exactly 1 is now treated the same way,
+     * since a lone chip with no alternative gives the visitor no real choice and isn't useful
+     * navigation).
      */
     public static function get_next_filter_suggestion($active, $skip_bases = [])
     {
@@ -959,6 +961,23 @@ class Shop
         }
 
         $active_bases = array_column($active, 'base');
+
+        // Chips are only offered when $active could be validly EXTENDED by appending the next
+        // dimension at the end — i.e. its origin/color/shape segments (if any) already form a
+        // contiguous, in-order prefix of self::NEXT_FILTER_PRIORITY, starting from origin. A
+        // single non-leading dimension active alone (/color/black/, /shape/rectangle/) or a chain
+        // that skips one (/origin/tabriz/shape/rectangle/, no color) fails this — suggesting a
+        // next filter there would mean starting a different leading segment, not extending this
+        // one, even though both remain perfectly valid, functional archive/chain pages on their
+        // own. A leading product_cat segment doesn't occupy a slot in this 3-element sequence at
+        // all (get_active_path_bases() always keeps it a separate leading entry — see
+        // parse_category_attribute_chain()), so a bare category page with no pa_* actives yet is
+        // always a valid, empty prefix and keeps suggesting origin same as before.
+        $priority_active = array_values(array_intersect(self::NEXT_FILTER_PRIORITY, $active_bases));
+        if ($priority_active !== array_slice(self::NEXT_FILTER_PRIORITY, 0, count($priority_active))) {
+            return null;
+        }
+
         $remaining = array_values(array_diff(self::NEXT_FILTER_PRIORITY, $active_bases, $skip_bases));
         if (empty($remaining)) {
             return null;
