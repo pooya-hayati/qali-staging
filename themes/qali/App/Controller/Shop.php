@@ -802,8 +802,61 @@ class Shop
     /**
      * The 8 attribute rewrite-slug bases, matching wp_woocommerce_attribute_taxonomies.attribute_name
      * (confirmed 1:1 with self::$tax_map's keys) — used to build the chained-URL rewrite rule below.
+     *
+     * 'size' stays in this list so the rewrite rule still matches /size/{term}/{anything}/ URLs —
+     * that's what lets parse_attribute_chain() intercept and 404 a size-chained URL (see its
+     * size-rejection block) instead of one falling through to some other rule, and it's also what
+     * keeps /size/{term}/page/N/ "Show More" pagination reload working (same 'top'-priority fix as
+     * every other single-attribute archive, see parse_attribute_chain()'s page/N comment). Size
+     * itself is never a candidate in self::CHAIN_DIMENSION_ORDER and can never end up in a
+     * resolved 2+ term chain — see parse_attribute_chain() / parse_category_attribute_chain().
      */
     public static $attribute_bases = ['color', 'design', 'feel', 'material', 'origin', 'shape', 'size', 'thickness'];
+
+    /**
+     * Fixed canonical segment order for every chainable URL, leading category segment included.
+     * Size is deliberately absent — it is excluded from the chaining system entirely (see
+     * parse_attribute_chain()) and only ever appears as its own native, non-chainable archive
+     * (/size/{term}/, untouched by any of this).
+     *
+     * A resolved chain whose segments don't already appear in this order is 301-redirected to the
+     * URL that does (see sort_chain_by_fixed_order() / redirect_to_ordered_chain()) rather than
+     * left to resolve as-is — unlike the old "any order resolves, canonical points elsewhere"
+     * scheme, there is now exactly one valid URL per filter combination.
+     */
+    const CHAIN_DIMENSION_ORDER = ['product-category', 'origin', 'color', 'design', 'shape', 'material', 'feel', 'thickness'];
+
+    /**
+     * Returns $entries (each carrying a 'base') reordered to match self::CHAIN_DIMENSION_ORDER.
+     * Any base not in that list (there shouldn't be one, by the time this is called) sorts last.
+     */
+    private static function sort_chain_by_fixed_order($entries)
+    {
+        $order = array_flip(self::CHAIN_DIMENSION_ORDER);
+        $sorted = $entries;
+        usort($sorted, function ($a, $b) use ($order) {
+            return ($order[$a['base']] ?? PHP_INT_MAX) <=> ($order[$b['base']] ?? PHP_INT_MAX);
+        });
+        return $sorted;
+    }
+
+    /**
+     * 301-redirects to the fixed-order equivalent of an out-of-order chain URL, preserving
+     * pagination and the query string ($_GET filters, sortby, etc.) exactly as requested.
+     */
+    private function redirect_to_ordered_chain($sorted_terms, $paged)
+    {
+        $url = home_url(self::chain_path($sorted_terms));
+        if ($paged !== null && $paged > 1) {
+            $url .= 'page/' . $paged . '/';
+        }
+        $query_string = $_SERVER['QUERY_STRING'] ?? '';
+        if ($query_string !== '') {
+            $url .= '?' . $query_string;
+        }
+        wp_safe_redirect($url, 301);
+        exit;
+    }
 
     /**
      * Populated once per request by parse_attribute_chain(), only when a chained attribute
@@ -951,18 +1004,32 @@ class Shop
         });
         $candidates = array_slice($candidates, 0, self::NEXT_FILTER_CHIP_CAP);
 
-        $path_parts = [];
+        // Insert $next_base at its self::CHAIN_DIMENSION_ORDER position rather than always at the
+        // end — $active is already in fixed order (it's sourced from an already-canonical page,
+        // or the client's own already-canonical page URL for the "Skip" AJAX case), so splitting
+        // it around $next_base's position and stitching the two halves back together with
+        // $next_base in between is enough to keep every generated chip URL in fixed order too.
+        $dimension_order = array_flip(self::CHAIN_DIMENSION_ORDER);
+        $next_order = $dimension_order[$next_base] ?? PHP_INT_MAX;
+        $prefix_parts = [];
+        $suffix_parts = [];
         foreach ($active as $entry) {
-            $path_parts[] = $entry['base'];
-            $path_parts[] = $entry['slug'];
+            if (($dimension_order[$entry['base']] ?? PHP_INT_MAX) < $next_order) {
+                $prefix_parts[] = $entry['base'];
+                $prefix_parts[] = $entry['slug'];
+            } else {
+                $suffix_parts[] = $entry['base'];
+                $suffix_parts[] = $entry['slug'];
+            }
         }
 
         $chips = [];
         foreach ($candidates as $c) {
+            $url_parts = array_merge($prefix_parts, [$next_base, $c['term']->slug], $suffix_parts);
             $chip = [
                 'name'  => $c['term']->name,
                 'count' => $c['count'],
-                'url'   => home_url('/' . implode('/', array_merge($path_parts, [$next_base, $c['term']->slug])) . '/'),
+                'url'   => home_url('/' . implode('/', $url_parts) . '/'),
             ];
 
             if ($next_base === 'color') {
@@ -1291,8 +1358,11 @@ class Shop
     }
 
     /**
-     * Registers ONE rewrite rule for every chained attribute-archive URL, in any order
-     * (/origin/tabriz/color/red/, /color/red/origin/tabriz/, a 3+ way chain, etc.).
+     * Registers ONE rewrite rule matching every chained attribute-archive URL regardless of segment
+     * order (/origin/tabriz/color/red/, /color/red/origin/tabriz/, a 3+ way chain, etc.) — parse_
+     * attribute_chain() is what actually enforces self::CHAIN_DIMENSION_ORDER, 301-redirecting an
+     * out-of-order match rather than this rule rejecting it outright, so a mistyped or old-format
+     * URL still lands the visitor on the right page instead of a 404.
      *
      * Deliberately requires a 3rd path segment ("(.+)$" after the first base/slug pair) so this
      * can never match a plain single-attribute URL like /origin/tabriz/ (that regex would need
@@ -1324,6 +1394,9 @@ class Shop
      * or a term slug that doesn't exist in the specific taxonomy its base names — e.g. the
      * pa_shape/pa_size "runner" collision is resolved by which base segment it appeared under,
      * never guessed) is routed to a real 404 rather than silently serving the wrong products.
+     * A chain that mixes "size" with any other base 404s the same way — size is excluded from
+     * chaining entirely. A resolved, otherwise-valid chain whose segments are out of
+     * self::CHAIN_DIMENSION_ORDER 301-redirects to the correctly-ordered URL instead.
      */
     public function parse_attribute_chain($wp)
     {
@@ -1384,6 +1457,28 @@ class Shop
             }
 
             $resolved[] = ['base' => $base, 'taxonomy' => $taxonomy, 'slug' => $slug, 'term' => $term];
+        }
+
+        // Size is a standalone, non-chainable filter only — its own native archive (/size/{term}/,
+        // 1 resolved entry, never reaches here at all) is untouched, but it must never appear
+        // alongside any other dimension in a chain (/size/large/color/red/, /origin/tabriz/size/
+        // large/, etc.). 404 rather than silently dropping the size segment and redirecting to the
+        // shorter chain: that would serve the visitor a materially different product set than the
+        // URL they requested without any indication anything changed.
+        if (count($resolved) >= 2 && in_array('size', array_column($resolved, 'base'), true)) {
+            $this->send_404($wp);
+            return;
+        }
+
+        // Fixed segment order (self::CHAIN_DIMENSION_ORDER): an out-of-order chain 301-redirects
+        // to its correctly-ordered equivalent instead of resolving as-is, so there's exactly one
+        // canonical URL per filter combination.
+        if (count($resolved) >= 2) {
+            $sorted = self::sort_chain_by_fixed_order($resolved);
+            if (array_column($sorted, 'base') !== array_column($resolved, 'base')) {
+                $this->redirect_to_ordered_chain($sorted, $paged);
+                return;
+            }
         }
 
         // First segment: make it a real native attribute-archive query, same as visiting it alone.
@@ -1505,6 +1600,23 @@ class Shop
             $resolved[] = ['base' => $base, 'taxonomy' => $taxonomy, 'slug' => $slug, 'term' => $term];
         }
 
+        // Size is never chainable with anything else, category included (see parse_attribute_chain()
+        // for the reasoning) — every entry here is by definition chained with the category, so any
+        // size segment at all is rejected. Bare /size/{term}/ is untouched (a different rewrite rule
+        // entirely — see register_category_chain_rewrite_rule()'s "product-category/" prefix).
+        if (in_array('size', array_column($resolved, 'base'), true)) {
+            $this->send_404($wp);
+            return;
+        }
+
+        // Fixed segment order past the (always-first) category segment — see parse_attribute_chain().
+        $category_entry = ['base' => 'product-category', 'taxonomy' => 'product_cat', 'slug' => $cat_slug, 'term' => $category_term];
+        $sorted_resolved = self::sort_chain_by_fixed_order($resolved);
+        if (array_column($sorted_resolved, 'base') !== array_column($resolved, 'base')) {
+            $this->redirect_to_ordered_chain(array_merge([$category_entry], $sorted_resolved), $paged);
+            return;
+        }
+
         $wp->query_vars['product_cat'] = $cat_slug;
 
         if ($paged !== null) {
@@ -1515,10 +1627,7 @@ class Shop
             self::$chain_extra_tax[$extra['taxonomy']][] = $extra['slug'];
         }
 
-        self::$category_chain_terms = array_merge(
-            [['base' => 'product-category', 'taxonomy' => 'product_cat', 'slug' => $cat_slug, 'term' => $category_term]],
-            $resolved
-        );
+        self::$category_chain_terms = array_merge([$category_entry], $resolved);
     }
 
     private function send_404($wp)
@@ -1612,20 +1721,18 @@ class Shop
     }
 
     /**
-     * Points every ordering of the same filter set at one canonical URL (bases sorted
-     * alphabetically) so N-way chains don't create N! duplicate-content variants — each ordering
-     * still renders fully (per spec), it just isn't the one search engines are told to index.
+     * Explicit canonical for a chain page. self::$chain_terms is always already in
+     * self::CHAIN_DIMENSION_ORDER by the time this runs — any out-of-order request 301-redirects
+     * in parse_attribute_chain() before a page ever renders — so this is just the current URL,
+     * stated explicitly rather than left to Yoast's own default (which chain_path() built anyway,
+     * this keeps a single source of truth for how a chain's canonical URL is spelled).
      */
     public function chain_canonical($canonical)
     {
         if (count(self::$chain_terms) < 2) {
             return $canonical;
         }
-        $sorted = self::$chain_terms;
-        usort($sorted, function ($a, $b) {
-            return strcmp($a['base'], $b['base']);
-        });
-        return home_url(self::chain_path($sorted));
+        return home_url(self::chain_path(self::$chain_terms));
     }
 
     /**
