@@ -1655,6 +1655,200 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
   color: var(--color-Black);
 }
 
+/* Consolidated filter bar (result count + active pills + Clear all on the left, standalone Sort
+   + the "Filter" button on the right) — replaces the old always-inline Price/Size/Color/Design/
+   Origin/Sort grid; those 5 filter-cards (Sort excluded, now standalone) move into #filter-modal
+   below, unchanged internally. Every rule here is written with flexbox/grid + logical (inset-
+   inline-*) properties rather than left/right, so it mirrors correctly under dir="rtl" with no
+   separate main.rtl.css override needed — confirmed, not just assumed, against every declaration
+   below before treating main.rtl.css as untouched for this task. */
+.page-header-filter-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.page-header-filter-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.page-header-filter-count {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-Neutral-700);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.page-header-filter-summary .page-header-filter-active {
+  padding-top: 0;
+  border-top: none;
+}
+
+.page-header-filter-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.page-header-sort {
+  min-width: 180px;
+  border: var(--border);
+  padding: 0 16px;
+}
+
+.page-header-sort .select-selected {
+  padding: 10px 0;
+}
+
+.page-header-sort .select-items {
+  inset-inline-start: -1px;
+  top: calc(100% + 4px);
+}
+
+.filter-modal-toggle {
+  position: relative;
+}
+
+.filter-modal-badge {
+  position: absolute;
+  top: -8px;
+  inset-inline-end: -8px;
+  background: var(--color-Black);
+  color: var(--color-White);
+  font-size: 12px;
+  line-height: 1;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Filter modal — same fixed full-viewport overlay mechanics as #sidebar (the main nav's own
+   overlay, toggled the same way: an .active class plus a dynamically-inserted .body-overlay and
+   a body state class, see shop.js) reused here rather than a new overlay pattern, sized as a
+   centered dialog on larger screens and expanding to a full-screen takeover at/below the tablet
+   breakpoint — matching the reference's mobile behavior the same way #sidebar already looks on
+   every screen size. */
+.filter-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1001;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.filter-modal.active {
+  display: flex;
+}
+
+.filter-modal-dialog {
+  background: var(--color-White);
+  width: 100%;
+  max-width: 720px;
+  max-height: 85vh;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.filter-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: var(--border);
+  flex-shrink: 0;
+}
+
+.filter-modal-title {
+  font-size: 18px;
+  font-weight: 500;
+  text-transform: uppercase;
+  margin: 0;
+  color: var(--color-Neutral-1000);
+}
+
+.filter-modal-close {
+  width: 24px;
+  height: 24px;
+  background: url(../img/icon-close.svg) no-repeat center/cover;
+  border: none;
+  padding: 0;
+  font-size: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.filter-modal-body {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.filter-modal-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px 20px;
+}
+
+/* The grid's last card (Origin, alone in the final row on both the 2-column desktop layout and
+   the 1-column mobile stack — see the max-width:767.98px override below) sits directly against
+   .filter-modal-body's scrollable bottom edge, so its dropdown would otherwise get clipped by
+   that overflow instead of overlaying the cards above it. Flipping just this one dropdown upward
+   is a smaller, more targeted fix than restructuring the grid or the scroll container. */
+.filter-modal-grid .filter-card:last-child .select-items {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
+
+.filter-modal-footer {
+  padding: 16px 24px;
+  border-top: var(--border);
+  flex-shrink: 0;
+}
+
+@media (max-width: 767.98px) {
+  .filter-modal {
+    padding: 0;
+  }
+
+  .filter-modal-dialog {
+    max-width: 100%;
+    max-height: 100dvh;
+    height: 100dvh;
+    border-radius: 0;
+  }
+
+  .filter-modal-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .page-header-filter-controls {
+    width: 100%;
+  }
+
+  .page-header-sort {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .filter-modal-toggle {
+    flex: 1;
+  }
+}
+
 /* "Suggested next filter" chips (pa_* archive pages, single-attribute or chained). Pill shape
    and hover color reuse .page-header-filter-active .filter-tag's / .show-more-btn's own
    established language (40px pill radius, #780000 -> #ac1f1f on hover) rather than new values. */

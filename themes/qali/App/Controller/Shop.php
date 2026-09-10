@@ -954,6 +954,70 @@ class Shop
     }
 
     /**
+     * The currently active path-based ATTRIBUTE segments only — self::get_active_path_bases()
+     * minus a leading 'product-category' entry, if any. Used by the consolidated filter bar's
+     * pill row (header-shop.php) to surface a page's own URL-driven filter(s) — e.g. "Rectangle"
+     * on a bare /shape/rectangle/ page, which has zero $_GET filters and would otherwise show no
+     * pill at all — alongside the existing $_GET-driven ones. The category itself is deliberately
+     * excluded: it's the page's primary navigational context (not one of the 5 filter-modal
+     * cards, and not something a "Clear all"/pill removal is meant to escape), not a filter pill.
+     */
+    public static function active_path_attribute_terms()
+    {
+        return array_values(array_filter(self::get_active_path_bases(), function ($entry) {
+            return $entry['base'] !== 'product-category';
+        }));
+    }
+
+    /**
+     * The URL for the current active path-based chain with one dimension removed by $base — used
+     * for a path-pill's "×" link (header-shop.php). Pure display-URL construction: dropping one
+     * entry from an already-fixed-order chain (self::CHAIN_DIMENSION_ORDER) leaves the rest in
+     * that same relative order, so this needs no reordering/validation logic of its own — it
+     * reuses chain_path() exactly the way chain_breadcrumb_links() already does for ancestor
+     * crumbs, just with an arbitrary entry dropped instead of a trailing slice. Falls back to the
+     * plain product archive when removing the only active entry leaves nothing.
+     */
+    public static function path_url_without($base_to_remove)
+    {
+        $remaining = array_values(array_filter(self::get_active_path_bases(), function ($entry) use ($base_to_remove) {
+            return $entry['base'] !== $base_to_remove;
+        }));
+        if (empty($remaining)) {
+            return get_post_type_archive_link('product');
+        }
+        return home_url(self::chain_path($remaining));
+    }
+
+    /**
+     * Count of currently active filter-modal dimensions (Price/Size/Color/Design/Origin — the 5
+     * filter-card fields inside header-shop.php's #filter-modal) for the "Filter" button's badge.
+     * Deliberately excludes sortby (its own standalone control now, never inside the modal) and
+     * any path-based/category filter (surfaced separately as its own pill — see
+     * active_path_attribute_terms() — not modal-manageable). Purely a read-only display
+     * computation: reads $_GET the same way build_filter_query_args() already does, without
+     * touching it.
+     */
+    public static function active_modal_filter_count()
+    {
+        $count = 0;
+        foreach (['size', 'color', 'design', 'origin'] as $key) {
+            if (!empty($_GET[$key])) {
+                $count++;
+            }
+        }
+
+        $prices = self::get_min_max_prices();
+        $min = isset($_GET['min_price']) ? floatval($_GET['min_price']) : null;
+        $max = isset($_GET['max_price']) ? floatval($_GET['max_price']) : null;
+        if (($min !== null && $min > $prices['min_price']) || ($max !== null && $max < $prices['max_price'])) {
+            $count++;
+        }
+
+        return $count;
+    }
+
+    /**
      * Computes the "suggested next filter" chip row for a given active path-based filter chain
      * (single or chained — pass self::get_active_path_bases() for a real page load; the "Skip"
      * AJAX handler below reconstructs the same shape from what the client sends, since that's a

@@ -207,29 +207,13 @@ $(document).ready(function () {
   });
 
   // Filter
-  // حذف همه فیلترها (به‌جز موارد مجاز)
-  $(".page-header-filter-reset").on("click", function () {
-    const url = window.location.href;
-    const urlParts = url.split("?");
-    if (urlParts.length < 2) return;
-
-    const baseUrl = urlParts[0];
-    const queryParams = urlParts[1].split("&");
-    const allowedParams = ["post_type", "product_category"];
-    const filteredParams = queryParams.filter(param => {
-      const key = param.split("=")[0];
-      return allowedParams.includes(key);
-    });
-
-    const newUrl = filteredParams.length
-      ? `${baseUrl}?${filteredParams.join("&")}`
-      : baseUrl;
-
-    window.location.href = newUrl;
-  });
-
-  // حذف فیلتر خاص با کلیک روی تگ
-  $(".filter-tag").on("click", function () {
+  // حذف فیلتر خاص با کلیک روی تگ — [data-key] scopes this to the $_GET-driven pills only
+  // (data-key/data-value are only ever printed on those); the newer path-based pills
+  // (header-shop.php's $active_path_pills, e.g. "Rectangle" on /shape/rectangle/) are plain
+  // <a href> links to a real, already-correct URL and need no JS at all — without this scoping,
+  // this handler would also fire on those (reading undefined key/value) and race its own
+  // same-page reassignment of window.location.href against the anchor's native navigation.
+  $(".filter-tag[data-key]").on("click", function () {
     const key = $(this).data("key");
     const value = $(this).data("value");
     const urlParams = new URLSearchParams(window.location.search);
@@ -249,6 +233,33 @@ $(document).ready(function () {
     const cleanedPath = window.location.pathname.replace(/\/page\/\d+\//, '/');
     const newUrl = `${cleanedPath}?${urlParams.toString()}`;
     window.location.href = newUrl;
+  });
+
+  // Filter modal — same show/hide + dynamically-inserted .body-overlay + body-class pattern as
+  // the search bar (see main.js's .search-toggle/.searchbar handlers) and the main nav's #sidebar,
+  // reused here rather than building a new overlay mechanism from scratch.
+  $(document).on("click", "body:not(.filter-modal-opened) .filter-modal-toggle", function () {
+    $("#filter-modal").addClass("active");
+    $("#filter-modal").before("<div class='body-overlay filter-modal-overlay'></div>");
+    $("body").addClass("filter-modal-opened body-overflow");
+  });
+
+  $(document).on(
+    "click",
+    "body.filter-modal-opened .filter-modal-overlay, body.filter-modal-opened .filter-modal-close, body.filter-modal-opened .filter-modal-apply",
+    function () {
+      $(".filter-modal-overlay").remove();
+      $("#filter-modal").removeClass("active");
+      $("body").removeClass("filter-modal-opened body-overflow");
+    }
+  );
+
+  $(document).on("keydown", function (e) {
+    if (e.key === "Escape" && $("body").hasClass("filter-modal-opened")) {
+      $(".filter-modal-overlay").remove();
+      $("#filter-modal").removeClass("active");
+      $("body").removeClass("filter-modal-opened body-overflow");
+    }
   });
 
 });
