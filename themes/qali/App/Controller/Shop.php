@@ -1698,14 +1698,31 @@ class Shop
     }
 
     /**
-     * H1/title text for a chain: term names in URL order + "Rugs", e.g. "Tabriz Red Rectangle Rugs",
-     * or "Colorful Vintage Tabriz Blue Rectangle Rugs" for a category-leading chain. Only ever
-     * non-empty on an actual chain page (2+ segments in whichever of self::$category_chain_terms /
-     * self::$chain_terms is active — same precedence and same reason as chain_breadcrumb_links())
-     * — a plain single-attribute or bare-category page has both arrays empty and is left completely
-     * alone. Deliberately uses each entry's plain term ->name (not a category's curated `seo_title`
-     * meta override) even for the leading category segment, since that override is meant to replace
-     * a bare category page's whole H1, not to be a prefix glued onto a generated attribute list.
+     * Appends the shared " Handmade Rugs" suffix used by every attribute-related archive H1/
+     * <title> (see chain_title_text() / bare_archive_title_text()) — first stripping a trailing
+     * "Rug"/"Rugs" word (case-insensitive) from $text if it already ends in one, so a name that's
+     * already rug-flavored (a category's own curated `seo_title` override, e.g. heritage-rug's
+     * "Newly Woven Heritage Rugs") becomes "Newly Woven Heritage Handmade Rugs" instead of the
+     * doubled-up "Newly Woven Heritage Rugs Handmade Rugs". Confirmed against every real category
+     * name/override on the live site (product_cat-sitemap.xml) before writing this — "Kilim Rug"
+     * (falls back to the plain term name) is the other real case this handles.
+     */
+    private static function append_handmade_rugs_suffix($text)
+    {
+        $text = preg_replace('/\s+rugs?$/i', '', $text);
+        return $text . ' ' . __('Handmade Rugs', LANG_STRING);
+    }
+
+    /**
+     * H1/title text for a chain: term names in URL order + " Handmade Rugs", e.g. "Tabriz Red
+     * Rectangle Handmade Rugs", or "Colorful Vintage Tabriz Blue Rectangle Handmade Rugs" for a
+     * category-leading chain. Only ever non-empty on an actual chain page (2+ segments in
+     * whichever of self::$category_chain_terms / self::$chain_terms is active — same precedence
+     * and same reason as chain_breadcrumb_links()) — a plain single-attribute or bare-category
+     * page has both arrays empty and is left to bare_archive_title_text() instead. Deliberately
+     * uses each entry's plain term ->name (not a category's curated `seo_title` meta override)
+     * even for the leading category segment, since that override is meant to replace a bare
+     * category page's whole H1, not to be a prefix glued onto a generated attribute list.
      */
     public static function chain_title_text()
     {
@@ -1719,12 +1736,51 @@ class Shop
         $names = array_map(function ($entry) {
             return $entry['term']->name;
         }, $chain);
-        return implode(' ', $names) . ' ' . __('Rugs', LANG_STRING);
+        return self::append_handmade_rugs_suffix(implode(' ', $names));
+    }
+
+    /**
+     * H1/title text for a bare (non-chained) product_cat page or a single, non-chained pa_*
+     * attribute archive — the two cases header-shop.php's own $category_term / $attribute_term
+     * branches already detect. Mirrors chain_title_text()'s own chain-vs-not gating exactly (a
+     * chain page's first segment also satisfies is_tax(pa_*), so this must return '' there and
+     * leave the whole page to chain_title_text() instead, same as header-shop.php's existing
+     * $chain_title === '' guard on $attribute_term). Uses the category's curated `seo_title` term
+     * meta override when set (same lookup header-shop.php's H1 used before this existed), falling
+     * back to the term's own name — either way run through append_handmade_rugs_suffix() so the
+     * H1 and <title> (via chain_title(), which calls this too) always match.
+     */
+    public static function bare_archive_title_text()
+    {
+        if (count(self::$category_chain_terms) >= 2 || count(self::$chain_terms) >= 2) {
+            return '';
+        }
+
+        if (is_tax('product_cat')) {
+            $term = get_queried_object();
+            if ($term instanceof WP_Term) {
+                $seo_title = get_term_meta($term->term_id, 'seo_title', true);
+                $base = ($seo_title !== '') ? $seo_title : $term->name;
+                return self::append_handmade_rugs_suffix($base);
+            }
+        }
+
+        if (is_tax(self::attribute_taxonomies())) {
+            $term = get_queried_object();
+            if ($term instanceof WP_Term) {
+                return self::append_handmade_rugs_suffix($term->name);
+            }
+        }
+
+        return '';
     }
 
     public function chain_title($title)
     {
         $text = self::chain_title_text();
+        if ($text === '') {
+            $text = self::bare_archive_title_text();
+        }
         if ($text === '') {
             return $title;
         }

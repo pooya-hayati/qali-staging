@@ -709,3 +709,28 @@ Deployed via SFTP (paramiko): `App/Controller/Shop.php` only.
 - `debug.log`: unchanged at 387,084,368 bytes, checked via SFTP `stat` immediately before and after every request above.
 
 Deployed via SFTP (paramiko): `App/Controller/Shop.php` only.
+
+## 35. Added a consistent " Handmade Rugs" suffix to every attribute-related archive H1/`<title>`
+
+**New consistent format everywhere: `{active filter terms in order} + "Handmade Rugs"`.** Previously the suffix only existed on chain pages (`chain_title_text()` appended plain `"Rugs"`, e.g. "Tabriz Black Rugs"), while single-attribute pages (`/shape/rectangle/` → just "Rectangle") and bare category pages (H1 only — the `<title>` tag was never synced to begin with, see below) had no suffix at all.
+
+**Shared building block: `append_handmade_rugs_suffix($text)`** — strips a trailing `"Rug"`/`"Rugs"` word (case-insensitive regex, `/\s+rugs?$/i`) before appending `" Handmade Rugs"`, so a name that's already rug-flavored doesn't double up. Checked every real category's actual curated title first (`product_cat-sitemap.xml`'s 7 terms, read live before writing any code) rather than guessing: `kilim-rug` falls back to its plain term name **"Kilim Rug"** (would've become "Kilim Rug Handmade Rugs" without the strip — now "Kilim Handmade Rugs"), and `heritage-rug` has a real curated `seo_title` override, **"Newly Woven Heritage Rugs"** (would've become "Newly Woven Heritage Rugs Handmade Rugs" — now "Newly Woven Heritage Handmade Rugs"). This is exactly the "existing curated title" collision the task warned about; every other category (`uncategorized`, `antique`, `colorful-vintage`, `modern`, `patina`) doesn't end in Rug/Rugs at all, so it's a plain append with nothing to strip.
+
+**`chain_title_text()`** (chain + category-chain H1/title, 2+ segments) — one-line change: swapped the old `implode(' ', $names) . ' ' . __('Rugs', ...)` for `append_handmade_rugs_suffix(implode(' ', $names))`. Its existing consumers (`header-shop.php`'s `$chain_title` for H1, `chain_title()`'s `wpseo_title` filter for `<title>`) needed no changes at all — they already share this one function, exactly as the task asked to preserve.
+
+**New `bare_archive_title_text()`** — the bare-category and single-attribute cases had no such shared function before this (H1 read `$category_seo_title`/`$attribute_term->name` directly in `header-shop.php`; `<title>` was Yoast's own untouched archive-title default, e.g. "Colorful Vintage Archives - Qali" — confirmed via §31, and re-confirmed live before touching anything, at the top of this task). Added one function covering both: mirrors `chain_title_text()`'s own chain-vs-not gating (returns `''` immediately if either chain array has 2+ entries, since a chain page's first segment also satisfies `is_tax(pa_*)`), then for `is_tax('product_cat')` reads the same curated `seo_title` term-meta-or-name lookup `header-shop.php` used to inline, and for `is_tax($attribute_taxonomies)` uses the plain term name — both run through `append_handmade_rugs_suffix()`.
+- `header-shop.php`: replaced its inline `$category_seo_title` computation with a call to the new shared function (`$bare_archive_title`), used for both the bare-category and single-attribute H1 branches; `$category_seo_description` (a separate, unrelated field shown *under* the H1) is untouched.
+- `chain_title()` (the `wpseo_title` filter): now falls back to `bare_archive_title_text()` when `chain_title_text()` returns `''`, so the exact same function backs both the H1 and the `<title>` tag on every one of the 4 page shapes (chain, category-chain, bare category, single attribute) — no second, duplicate title-building path introduced anywhere.
+
+**Verified live (curl), H1 and `<title>` checked together for every case:**
+- `/shape/rectangle/` → **"Rectangle Handmade Rugs"** (both).
+- `/color/black/` → **"Black Handmade Rugs"** (both).
+- `/origin/tabriz/color/black/` → **"Tabriz Black Handmade Rugs"** (both).
+- `/product-category/colorful-vintage/` → **"Colorful Vintage Handmade Rugs"** (both) — sensible, no redundant "Rugs".
+- `/product-category/colorful-vintage/origin/tabriz/` → **"Colorful Vintage Tabriz Handmade Rugs"** (both).
+- `/origin/tabriz/color/black/shape/rectangle/` (3-deep chain, beyond what was explicitly asked) → **"Tabriz Black Rectangle Handmade Rugs"** (both).
+- All 7 real categories checked directly: `kilim-rug` → "Kilim Handmade Rugs", `heritage-rug` → "Newly Woven Heritage Handmade Rugs" (both correctly de-duplicated), the other 5 → plain `"{Name} Handmade Rugs"`.
+- Both `page-header-category-description` blocks (bare-category `seo_description`, single-attribute `term_description()`) still render under the new H1 text — confirmed unaffected.
+- `debug.log`: unchanged at 387,084,368 bytes, checked via SFTP `stat` immediately before and after every request above.
+
+Deployed via SFTP (paramiko): `App/Controller/Shop.php`, `templates/header/header-shop.php`.

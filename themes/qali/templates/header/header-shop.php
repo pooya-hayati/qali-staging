@@ -18,15 +18,14 @@ $min_price_value = $filters_map['min_price'] ?? $prices['min_price'];
 $max_price_value = $filters_map['max_price'] ?? $prices['max_price'];
 
 $chain_title = \App\Controller\Shop::chain_title_text();
+// Bare (non-chained) category or single-attribute page H1 — same source Shop::chain_title()
+// reads for the <title> tag, so the two never drift apart. Empty on every other page, including
+// a chain (chain_title() falls back to this only when $chain_title itself is '').
+$bare_archive_title = \App\Controller\Shop::bare_archive_title_text();
 
 $category_term = is_tax('product_cat') ? get_queried_object() : null;
-$category_seo_title = '';
 $category_seo_description = '';
 if ($category_term instanceof WP_Term) {
-	$category_seo_title = get_term_meta($category_term->term_id, 'seo_title', true);
-	if ($category_seo_title === '') {
-		$category_seo_title = $category_term->name;
-	}
 	$category_seo_description = get_term_meta($category_term->term_id, 'seo_description', true);
 }
 
@@ -75,12 +74,12 @@ $next_filter_suggestion = !empty($next_filter_active)
 						<?php if ($chain_title !== '') : ?>
 							<h1 class="page-header-category-title"><?= esc_html($chain_title) ?></h1>
 						<?php elseif ($category_term instanceof WP_Term) : ?>
-							<h1 class="page-header-category-title"><?= esc_html($category_seo_title) ?></h1>
+							<h1 class="page-header-category-title"><?= esc_html($bare_archive_title) ?></h1>
 							<?php if (! empty($category_seo_description)) : ?>
 								<div class="page-header-category-description"><?= wp_kses_post($category_seo_description) ?></div>
 							<?php endif; ?>
 						<?php elseif ($attribute_term instanceof WP_Term) : ?>
-							<h1 class="page-header-category-title"><?= esc_html($attribute_term->name) ?></h1>
+							<h1 class="page-header-category-title"><?= esc_html($bare_archive_title) ?></h1>
 							<?php if (! empty($attribute_description)) : ?>
 								<div class="page-header-category-description"><?= wp_kses_post($attribute_description) ?></div>
 							<?php endif; ?>
