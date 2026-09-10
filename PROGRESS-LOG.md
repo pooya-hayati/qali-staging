@@ -683,3 +683,29 @@ Deployed via SFTP (paramiko): `App/Controller/Shop.php` only.
 - `debug.log`: unchanged at 387,084,368 bytes, checked via SFTP `stat` immediately before and after every request above.
 
 Deployed via SFTP (paramiko): `App/Controller/Shop.php` only.
+
+## 34. Replaced the strict origin-first-prefix chip rule with a fixed pairwise rule
+
+**Problem with §33's prefix rule:** requiring `$active`'s origin/color/shape segments to be a contiguous prefix starting at `origin` meant `/color/{term}/` and `/shape/{term}/` — both real, functional single-attribute archive pages — showed no chip row at all, since neither starts with `origin`. That satisfied §33's own ask at the time, but this task asks for something different: every single-attribute page should suggest *something*, just not always "origin."
+
+**New rule, in `get_next_filter_suggestion()`:** counts how many of `origin`/`color`/`shape` are active (`$active_in_sequence`, unchanged from §33) and branches on that count instead of checking prefix-validity:
+- **0 active** (bare category page) or **2 active** (missing exactly one) — both still just use `self::NEXT_FILTER_PRIORITY`'s list order (`array_diff` against it): diffing the full 3-item list against zero actives naturally starts at `origin`; diffing against two actives always leaves exactly the one missing dimension, regardless of which two. No new logic needed for either case — this is exactly what the pre-§33 code already did, it's the "must be a contiguous prefix" gate on top of it that got removed.
+- **Exactly 1 active** — now uses a new `const SINGLE_ACTIVE_PAIRING = ['origin' => 'color', 'color' => 'shape', 'shape' => 'color']` instead of list order (list order would have suggested `origin` from `/color/{term}/` and `/shape/{term}/` too, which isn't what was asked): `origin`→`color` (unchanged from before), `color`→`shape`, `shape`→`color`. A "Skip" on the single candidate this produces has nothing to fall back to (unlike the 0/2-active branch, the pairwise rule only ever has one answer per active dimension) — `$skip_bases` containing that one candidate now returns `null` outright rather than trying a second option that doesn't exist.
+- **All 3 active** — unchanged depth cap, still `null`.
+
+**URL reconstruction — confirmed already correct, no changes needed:** the chip-URL builder that splits `$active` into prefix/suffix around the suggested dimension's `CHAIN_DIMENSION_ORDER` position (added in §32, to fix the same problem for chip-appending in general) already handles every one of the 6 single/double-active cases correctly, since it was built generically against `CHAIN_DIMENSION_ORDER` rather than assuming append-only. Traced through by hand for the two cases this task specifically flagged as risky before touching anything:
+- `/shape/{term}/` (shape active alone, order 4) suggesting `color` (order 2): `color`'s order is less than shape's, so it goes to the prefix half → link is `/color/{new-term}/shape/{term}/`, not `/shape/{term}/color/{new-term}/`.
+- `/color/{term}/shape/{term}/` (color+shape active) suggesting `origin` (order 1): both active dimensions sort after `origin`, so both land in the suffix half → link is `/origin/{new-term}/color/{term}/shape/{term}/`, origin correctly spliced in at the front.
+
+**Verified live (curl), all 6 single/double-active combinations, confirming both the suggested dimension and that every chip `href` resolves `200` (not `404`):**
+- `/origin/tabriz/` → "Narrow by Color", chips append (`/origin/tabriz/color/black/` → `200`).
+- `/color/black/` → "Narrow by Shape", chips append (`/color/black/shape/rectangle/` → `200`).
+- `/shape/rectangle/` → "Narrow by Color", chips **reordered to lead** (`/color/beige/shape/rectangle/` → `200`).
+- `/origin/tabriz/color/black/` (origin+color) → "Narrow by Shape", chips append (`/origin/tabriz/color/black/shape/rectangle/` → `200`).
+- `/origin/tabriz/shape/rectangle/` (origin+shape) → "Narrow by Color", chip **spliced in the middle** — `/origin/tabriz/color/beige/shape/rectangle/` → `200`.
+- `/color/black/shape/rectangle/` (color+shape) → "Narrow by Origin", chip **spliced at the front** — `/origin/tabriz/color/black/shape/rectangle/` → `200`.
+- `/origin/tabriz/color/black/shape/rectangle/` (all 3 active) → confirmed **zero** `page-header-next-filter` elements — depth cap unaffected.
+- `/product-category/colorful-vintage/` (0 attribute actives) → still "Narrow by Origin" — category-led behavior unaffected.
+- `debug.log`: unchanged at 387,084,368 bytes, checked via SFTP `stat` immediately before and after every request above.
+
+Deployed via SFTP (paramiko): `App/Controller/Shop.php` only.

@@ -876,17 +876,36 @@ class Shop
     public static $chain_extra_tax = [];
 
     /**
-     * Priority order for the "suggested next filter" chip row (see get_next_filter_suggestion()):
-     * the first dimension in this list NOT already active in the current URL is the one suggested.
-     * Reduced from all 8 attribute dimensions to these 3 per explicit user direction — design,
-     * material, feel, thickness, and (as of this list) size should never be suggested as a chip,
-     * though they remain fully functional as sidebar filters (size in particular is a normal
-     * sidebar <select>) and in manually-typed chain URLs; only this chip-suggestion priority list
-     * is narrowed. A fully-chained origin+color+shape page naturally yields an empty $remaining
-     * in get_next_filter_suggestion() and renders no chip row — no separate depth-cap constant
+     * The 3 dimensions eligible for the "suggested next filter" chip row (see
+     * get_next_filter_suggestion()). Reduced from all 8 attribute dimensions per explicit user
+     * direction — design, material, feel, thickness, and size should never be suggested as a
+     * chip, though they remain fully functional as sidebar filters (size in particular is a
+     * normal sidebar <select>) and in manually-typed chain URLs; only this chip-suggestion list
+     * is narrowed.
+     *
+     * Used directly, in this list's order, for the 0-active case (a bare category page — diffing
+     * the full list against zero actives starts at origin) and the 2-active case (diffing always
+     * leaves exactly the one missing dimension, regardless of which two are active). The 1-active
+     * case does NOT use this list's order — see self::SINGLE_ACTIVE_PAIRING instead. A
+     * fully-chained origin+color+shape page naturally yields an empty $remaining in
+     * get_next_filter_suggestion() and renders no chip row — no separate depth-cap constant
      * needed, the 3-element list itself is the cap.
      */
     const NEXT_FILTER_PRIORITY = ['origin', 'color', 'shape'];
+
+    /**
+     * Fixed pairwise "what to suggest" rule for a single-attribute page — exactly one of
+     * origin/color/shape active (no category, no chain: /origin/{term}/, /color/{term}/, or
+     * /shape/{term}/ alone). Per explicit user direction, NOT "the next dimension in
+     * self::NEXT_FILTER_PRIORITY not yet active" — that would suggest origin from every one of
+     * the three single-attribute pages, including /color/{term}/ and /shape/{term}/, which isn't
+     * what's wanted here.
+     */
+    const SINGLE_ACTIVE_PAIRING = [
+        'origin' => 'color',
+        'color'  => 'shape',
+        'shape'  => 'color',
+    ];
 
     /** Cap on how many candidate-term chips are rendered for the suggested dimension. */
     const NEXT_FILTER_CHIP_CAP = 12;
@@ -939,18 +958,22 @@ class Shop
      * (single or chained — pass self::get_active_path_bases() for a real page load; the "Skip"
      * AJAX handler below reconstructs the same shape from what the client sends, since that's a
      * separate request with no page context of its own, same reason ajax_load_more_products()
-     * needs archive_pa_filters instead of relying on self::$chain_terms): the first not-yet-active
-     * dimension in self::NEXT_FILTER_PRIORITY (skipping any base named in $skip_bases too, for the
-     * "Skip" UI), its candidate terms each counted against $active + that term (reusing
-     * build_filter_query_args()'s tax_query for the $_GET-driven part, same single source of truth
-     * as everywhere else), zero-result terms excluded, capped at self::NEXT_FILTER_CHIP_CAP terms
-     * with the most products first.
+     * needs archive_pa_filters instead of relying on self::$chain_terms): which dimension to
+     * suggest depends on how many of origin/color/shape are currently active — 0 (a bare category
+     * page) or 2 (missing exactly one) both use self::NEXT_FILTER_PRIORITY's list order directly;
+     * exactly 1 (a single-attribute page) uses self::SINGLE_ACTIVE_PAIRING's fixed pairwise rule
+     * instead (see both constants' own docs for why). Either way, $skip_bases removes a dimension
+     * from consideration too, for the "Skip" UI. Its candidate terms are each counted against
+     * $active + that term (reusing build_filter_query_args()'s tax_query for the $_GET-driven
+     * part, same single source of truth as everywhere else), zero-result terms excluded, capped
+     * at self::NEXT_FILTER_CHIP_CAP terms with the most products first.
      *
-     * Returns null when $active is empty (product_cat, shop, etc. should pass []), when every
-     * dimension is already active, when $active's origin/color/shape segments aren't a valid
-     * contiguous prefix of self::NEXT_FILTER_PRIORITY (see the prefix check below), or — recursing
-     * past it — when a dimension turns out to have fewer than 2 viable candidates against the
-     * current chain (zero is a dead end same as before; exactly 1 is now treated the same way,
+     * Returns null when $active is empty (product_cat, shop, etc. should pass []), when all 3 of
+     * origin/color/shape are already active (the existing depth cap), when the 1-active case's
+     * paired dimension has been skipped (there's no second candidate to fall back to — unlike the
+     * 0/2-active list-order case, the pairwise rule only ever has one answer), or — recursing past
+     * either branch — when a dimension turns out to have fewer than 2 viable candidates against
+     * the current chain (zero is a dead end same as before; exactly 1 is now treated the same way,
      * since a lone chip with no alternative gives the visitor no real choice and isn't useful
      * navigation).
      */
@@ -961,30 +984,36 @@ class Shop
         }
 
         $active_bases = array_column($active, 'base');
+        $active_in_sequence = array_values(array_intersect(self::NEXT_FILTER_PRIORITY, $active_bases));
 
-        // Chips are only offered when $active could be validly EXTENDED by appending the next
-        // dimension at the end — i.e. its origin/color/shape segments (if any) already form a
-        // contiguous, in-order prefix of self::NEXT_FILTER_PRIORITY, starting from origin. A
-        // single non-leading dimension active alone (/color/black/, /shape/rectangle/) or a chain
-        // that skips one (/origin/tabriz/shape/rectangle/, no color) fails this — suggesting a
-        // next filter there would mean starting a different leading segment, not extending this
-        // one, even though both remain perfectly valid, functional archive/chain pages on their
-        // own. A leading product_cat segment doesn't occupy a slot in this 3-element sequence at
-        // all (get_active_path_bases() always keeps it a separate leading entry — see
-        // parse_category_attribute_chain()), so a bare category page with no pa_* actives yet is
-        // always a valid, empty prefix and keeps suggesting origin same as before.
-        $priority_active = array_values(array_intersect(self::NEXT_FILTER_PRIORITY, $active_bases));
-        if ($priority_active !== array_slice(self::NEXT_FILTER_PRIORITY, 0, count($priority_active))) {
+        // All 3 already active — the existing depth cap, unchanged.
+        if (count($active_in_sequence) >= 3) {
             return null;
         }
 
-        $remaining = array_values(array_diff(self::NEXT_FILTER_PRIORITY, $active_bases, $skip_bases));
-        if (empty($remaining)) {
-            return null;
+        if (count($active_in_sequence) === 1) {
+            // Single-attribute page: self::SINGLE_ACTIVE_PAIRING's fixed pairwise rule, not "the
+            // next dimension in list order not yet active" — see that constant's own doc. Only
+            // one candidate dimension exists per active dimension here, so skipping it leaves
+            // nothing else to offer (unlike the 0/2-active branch below, which can still fall back
+            // to whatever list-order leaves after removing a skipped dimension).
+            $next_base = self::SINGLE_ACTIVE_PAIRING[$active_in_sequence[0]];
+            if (in_array($next_base, $skip_bases, true)) {
+                return null;
+            }
+        } else {
+            // 0 active (bare category page) or 2 active (missing exactly one): list order already
+            // gives the right answer either way — diffing the full 3-item list against zero
+            // actives starts at origin, and against two actives always leaves exactly the one
+            // dimension that's missing, regardless of which two those are.
+            $remaining = array_values(array_diff(self::NEXT_FILTER_PRIORITY, $active_bases, $skip_bases));
+            if (empty($remaining)) {
+                return null;
+            }
+            $next_base = $remaining[0];
         }
 
-        $next_base = $remaining[0];
-        $taxonomy  = self::$tax_map[$next_base];
+        $taxonomy = self::$tax_map[$next_base];
 
         $active_clauses = [];
         foreach ($active as $entry) {
