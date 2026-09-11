@@ -420,7 +420,23 @@ $(document).ready(function () {
       // بررسی راست‌به‌چپ بودن صفحه
       const isRTL = $("body").hasClass("rtl");
 
-      track.width(track.parent().width());
+      /**
+       * Measures the track against its parent's CURRENT rendered width. Needs to be re-run (not
+       * just called once at plugin-init time) because this slider now lives inside the filter
+       * modal's Price submenu (hidden — display:none — until tapped open); a display:none
+       * ancestor makes .width() read 0 at init, and jQuery's .width(0) call below then bakes that
+       * 0 in as a literal inline style that never updates on its own once the submenu is shown.
+       * Re-measuring here — at drag-start and on every drag move, plus once more from shop.js the
+       * moment the submenu becomes visible (see the exposed rangeSliderRefresh data method) —
+       * fixes both the visually squashed-to-0 track on first open and the NaN it produced once
+       * dragged (0-width track -> newLeft/track.width() is 0/0 -> NaN -> written straight into
+       * the min/max hidden inputs and, from there, into the main list row's displayed value).
+       */
+      function refreshTrackWidth() {
+        track.width(track.parent().width());
+      }
+
+      refreshTrackWidth();
 
       let trackWidth = track.width();
       const stepValue = parseInt(rangeSlider.data("step")) || 1;
@@ -467,6 +483,7 @@ $(document).ready(function () {
       }
 
       function moveThumb(event, thumb) {
+        refreshTrackWidth();
         const trackOffset = track.offset().left;
         const pageX = event.pageX || event.originalEvent.touches[0].pageX;
         let newLeft = pageX - trackOffset;
@@ -496,6 +513,7 @@ $(document).ready(function () {
       function attachEvents(thumb) {
         thumb.on("mousedown touchstart", function (event) {
           event.preventDefault();
+          refreshTrackWidth();
           $(document).on("mousemove touchmove", function (e) {
             moveThumb(e, thumb);
           });
@@ -509,6 +527,12 @@ $(document).ready(function () {
       attachEvents(minThumb);
       attachEvents(maxThumb);
       updateThumbs();
+
+      // Exposed so other scripts (shop.js, when it reveals this slider by opening the filter
+      // modal's Price submenu) can re-measure the track without re-invoking this whole plugin —
+      // calling customRangeSlider() again would re-bind attachEvents()'s mousedown/touchstart
+      // handlers a second time, double-firing every subsequent drag.
+      rangeSlider.data("rangeSliderRefresh", refreshTrackWidth);
     });
 
     function formatNumberWithCommas(number) {

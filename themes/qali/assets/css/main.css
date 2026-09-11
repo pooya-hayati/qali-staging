@@ -1750,8 +1750,11 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 24px;
-  border-bottom: var(--border);
+  padding: 22px 24px;
+  /* A light hairline, not --border's near-black Neutral-900 — reusing the theme's own existing
+     "subtle list divider" convention (.product-info>li already uses this exact 0.5px Neutral-200
+     rule for the same kind of label/value row list) rather than inventing a new color. */
+  border-bottom: 0.5px solid var(--color-Neutral-200);
   flex-shrink: 0;
 }
 
@@ -1764,14 +1767,20 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
 }
 
 .filter-modal-close {
-  width: 24px;
-  height: 24px;
-  background: url(../img/icon-close.svg) no-repeat center/cover;
+  width: 32px;
+  height: 32px;
+  margin: -4px;
+  background: url(../img/icon-close.svg) no-repeat center/20px;
   border: none;
   padding: 0;
   font-size: 0;
   cursor: pointer;
   flex-shrink: 0;
+  border-radius: 50%;
+}
+
+.filter-modal-close:hover {
+  background-color: var(--color-Neutral-50);
 }
 
 .filter-modal-body {
@@ -1781,8 +1790,8 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
 }
 
 .filter-modal-footer {
-  padding: 16px 24px;
-  border-top: var(--border);
+  padding: 18px 24px;
+  border-top: 0.5px solid var(--color-Neutral-200);
   flex-shrink: 0;
 }
 
@@ -1831,7 +1840,7 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
 
 .filter-submenu-heading-icon {
   display: inline-flex;
-  color: var(--color-Neutral-1000);
+  color: var(--color-CarpetRed);
   flex-shrink: 0;
 }
 
@@ -1844,15 +1853,19 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
 .filter-list-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   width: 100%;
-  padding: 16px 0;
+  padding: 18px 0;
   background: none;
   border: none;
-  border-bottom: var(--border);
+  border-bottom: 0.5px solid var(--color-Neutral-200);
   text-align: start;
   cursor: pointer;
   font: inherit;
+}
+
+.filter-list-row:hover {
+  background: var(--color-Neutral-50);
 }
 
 .filter-list-rows .filter-list-row:last-child {
@@ -1897,12 +1910,16 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
 .filter-submenu-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   width: 100%;
-  padding: 14px 0;
-  border-bottom: var(--border);
+  padding: 16px 0;
+  border-bottom: 0.5px solid var(--color-Neutral-200);
   cursor: pointer;
   position: relative;
+}
+
+.filter-submenu-row:hover {
+  background: var(--color-Neutral-50);
 }
 
 .filter-submenu-rows .filter-submenu-row:last-child {

@@ -300,7 +300,16 @@ $(document).ready(function () {
   $(document).on("click", ".filter-list-row", function () {
     const dimension = $(this).data("dimension");
     $("#filter-modal .filter-modal-screen").removeClass("active");
-    $(`#filter-modal .filter-submenu[data-dimension="${dimension}"]`).addClass("active");
+    const $submenu = $(`#filter-modal .filter-submenu[data-dimension="${dimension}"]`).addClass("active");
+
+    // The price submenu's range-slider is hidden (display:none) until this exact moment, so
+    // main.js's customRangeSlider() plugin measured its track as 0-wide at page-load init —
+    // re-measure now that it's actually visible (see main.js's own refreshTrackWidth() doc for
+    // why this couldn't just be fixed once at init time).
+    const refresh = $submenu.find(".range-slider").data("rangeSliderRefresh");
+    if (typeof refresh === "function") {
+      refresh();
+    }
   });
 
   $(document).on("click", ".filter-submenu-back, .filter-submenu-ok", function () {
