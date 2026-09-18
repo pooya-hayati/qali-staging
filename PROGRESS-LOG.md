@@ -829,3 +829,89 @@ Deployed via SFTP (paramiko): `assets/js/main.js`, `assets/js/shop.js`, `assets/
 **Not verified:** the wp-admin Edit Category screen's WYSIWYG rendering of the new content (no wp-admin/browser access this session — `claude-in-chrome` wasn't connected). Content is confirmed stored and filtering correctly through `term_description()`, so it should display correctly there, but this wasn't visually confirmed.
 
 **Follow-up — resolved a user-reported contradiction (a past screenshot appeared to show Design Philosophy text rendered on-page for `colorful-vintage`):** traced both fields' actual live content side-by-side. `header-shop.php:29,140`'s on-page `.page-header-category-description` block reads `seo_description` **term-meta** (the §10 field) — confirmed via `curl` that `colorful-vintage`'s on-page block currently shows §10's short blurb ("Colorful Vintage rugs take timeless Persian patterns...`"), while its `og:description` meta tag (native `description` field, what this task writes) holds the full Design Philosophy text — two different fields, neither currently overlapping for any of the 6 categories. So no category's page currently shows Design Philosophy text on-page today; the screenshot likely predates §10 (which overwrote whatever was in the on-page slot with new short blurbs) or was of `og:description`/a meta preview rather than the rendered page itself. **User decided:** leave Design Philosophy as meta-only (native `description`/`og:description`), matching the other 5's current actual state — no change to any `seo_description` on-page field. Part 3 is complete as of this entry.
+
+---
+
+## 40. Renamed all 6 style-based product categories (title + slug) with 301 redirects, per finalized SEO keyword research
+
+**Approach:** no WP-CLI/SSH/REST access (REST confirmed `rest_api_disabled`) and `claude-in-chrome` could not connect in this Codespace despite repeated attempts — used the same one-off SFTP-uploaded-PHP-script pattern as §10/§39 for each category: upload, hit once via `curl`, read JSON result, delete immediately, confirm 404. One category at a time, reporting back before starting the next, per instruction.
+
+**Pre-flight, before touching anything:** dumped all 7 live `product_cat` terms via a read-only script — every old slug in the task's table matched the live DB exactly (`antique`, `colorful-vintage`, `kilim-rug`, `modern`, `heritage-rug`, `patina`, plus untouched `uncategorized`), so no surprises there. Grepped the entire theme for every old slug as a literal string (`'antique'`, `"colorful-vintage"`, etc.) — zero hardcoded references anywhere in `themes/qali`, confirming category URLs are generated dynamically from the live term slug (standard WP taxonomy rewrite, not a per-term hardcoded rule) and a slug change needs no rewrite-rule flush or code change to take effect.
+
+**Redirect mechanism:** confirmed Yoast SEO Premium (already active, v24.5) ships its own redirect manager (`modules/wordpress-seo-premium/classes/redirect/*` — `WPSEO_Redirect_Manager`, `WPSEO_Redirect`, `WPSEO_Redirect_Types::PERMANENT` = 301) — used that directly from each rename script rather than adding a custom rewrite rule or new plugin.
+
+**Per-category change:** `wp_update_term($term_id, 'product_cat', ['name' => ..., 'slug' => ...])` (looked up by the confirmed old slug, not a hardcoded term ID) immediately followed by `(new WPSEO_Redirect_Manager())->create_redirect(new WPSEO_Redirect('/product-category/{old-slug}/', '/product-category/{new-slug}/', WPSEO_Redirect_Types::PERMANENT))`, both in the same script/request so a rename is never left without its redirect even if the request fails partway.
+
+### Antique → Antique Persian Rugs
+
+- Old: `antique` (term_id 481) → New name **"Antique Persian Rugs"**, new slug **`antique-persian-rugs`**.
+- `wp_update_term` succeeded; confirmed `after_name`/`after_slug` in the script's JSON response.
+- 301 redirect created: `/product-category/antique/` → `/product-category/antique-persian-rugs/`.
+- **Verified live via `curl`:** new URL → `200`, H1 and `<title>` both read **"Antique Persian Handmade Rugs"** (confirms Part 2's existing `append_handmade_rugs_suffix()` fix already handles this new rug-ending name correctly, no duplicate "Rugs" — see §35/§38). Old URL → `301` with `location: https://dev.qali.art/product-category/antique-persian-rugs/`; `curl -L` follows it straight through to `200` at the new URL, no loop.
+
+### Colorful Vintage → Vintage Persian Rugs
+
+- Old: `colorful-vintage` (term_id 368) → New name **"Vintage Persian Rugs"**, new slug **`vintage-persian-rugs`**.
+- `wp_update_term` succeeded; confirmed in JSON response.
+- 301 redirect created: `/product-category/colorful-vintage/` → `/product-category/vintage-persian-rugs/`.
+- **Verified live via `curl`:** new URL → `200`, H1 and `<title>` both read **"Vintage Persian Handmade Rugs"** — no duplicate "Rugs". Old URL → `301` with correct `location` header; `curl -L` follows straight through to `200` at the new URL, no loop.
+
+### Modern → Modern Persian Rugs
+
+- Old: `modern` (term_id 366) → New name **"Modern Persian Rugs"**, new slug **`modern-persian-rugs`**.
+- `wp_update_term` succeeded; confirmed in JSON response.
+- 301 redirect created: `/product-category/modern/` → `/product-category/modern-persian-rugs/`.
+- **Verified live via `curl`:** new URL → `200`, H1 and `<title>` both read **"Modern Persian Handmade Rugs"** — no duplicate "Rugs". Old URL → `301` with correct `location` header; `curl -L` follows straight through to `200` at the new URL, no loop.
+
+### Kilim Rug → Kilim Persian Rugs
+
+- Old: `kilim-rug` (term_id 401) → New name **"Kilim Persian Rugs"**, new slug **`kilim-persian-rugs`**. (No `seo_title` meta override existed on this term — confirmed via §35's prior investigation — so the H1/title source is the plain term name, i.e. this new name takes effect immediately with no second field to update.)
+- `wp_update_term` succeeded; confirmed in JSON response.
+- 301 redirect created: `/product-category/kilim-rug/` → `/product-category/kilim-persian-rugs/`.
+- **Verified live via `curl`:** new URL → `200`, H1 and `<title>` both read **"Kilim Persian Handmade Rugs"** — no duplicate "Rugs" (this is the category whose old name, "Kilim Rug," was §35's original single-trailing-"Rug" test case — the new "Kilim Persian Rugs" name still strips correctly). Old URL → `301` with correct `location` header; `curl -L` follows straight through to `200` at the new URL, no loop.
+
+### Newly Woven Heritage Rugs → Heritage Rugs
+
+- Old: `heritage-rug` (term_id 408) → New name **"Heritage Rugs"**, new slug **`heritage-rugs`**.
+- **Correction to §35's record:** §35 described this term as having "a real curated `seo_title` override, 'Newly Woven Heritage Rugs.'" This rename script read that meta key live before touching anything and it came back **empty** (`seo_title_before: ""`) — the H1/title text was always just falling back to the plain term name (which happened to already read "Newly Woven Heritage Rugs"), not an actual per-field override. Harmless either way, but noted here in case §35 is referenced again.
+- `wp_update_term` succeeded for name+slug; also wrote `update_term_meta($term_id, 'seo_title', 'Heritage Rugs')` explicitly (matches the new name, keeps the override field internally consistent going forward even though it wasn't strictly required this time).
+- 301 redirect created: `/product-category/heritage-rug/` → `/product-category/heritage-rugs/`.
+- **Verified live via `curl`:** new URL → `200`, H1 and `<title>` both read **"Heritage Handmade Rugs"** — no duplicate "Rugs". Old URL → `301` with correct `location` header; `curl -L` follows straight through to `200` at the new URL, no loop.
+
+### Patina → Patina Rugs
+
+- Old: `patina` (term_id 375) → New name **"Patina Rugs"**, new slug **`patina-rugs`**.
+- `wp_update_term` succeeded; confirmed in JSON response.
+- 301 redirect created: `/product-category/patina/` → `/product-category/patina-rugs/`.
+- **Verified live via `curl`:** new URL → `200`, H1 and `<title>` both read **"Patina Handmade Rugs"** — no duplicate "Rugs". Old URL → `301` with correct `location` header; `curl -L` follows straight through to `200` at the new URL, no loop.
+
+**All 6 renames complete:**
+
+| Old slug | New slug | New name | New H1/title |
+|---|---|---|---|
+| `antique` | `antique-persian-rugs` | Antique Persian Rugs | Antique Persian Handmade Rugs |
+| `colorful-vintage` | `vintage-persian-rugs` | Vintage Persian Rugs | Vintage Persian Handmade Rugs |
+| `modern` | `modern-persian-rugs` | Modern Persian Rugs | Modern Persian Handmade Rugs |
+| `kilim-rug` | `kilim-persian-rugs` | Kilim Persian Rugs | Kilim Persian Handmade Rugs |
+| `heritage-rug` | `heritage-rugs` | Heritage Rugs | Heritage Handmade Rugs |
+| `patina` | `patina-rugs` | Patina Rugs | Patina Handmade Rugs |
+
+Every rename used `wp_update_term()` (name+slug), every redirect used Yoast SEO Premium's own `WPSEO_Redirect_Manager`/`WPSEO_Redirect(..., WPSEO_Redirect_Types::PERMANENT)` — no custom rewrite rules added, no code deployed for the renames themselves (theme was already slug-agnostic, confirmed by the pre-flight grep). All 6 old→new pairs individually verified live via `curl` (200 on new, 301→200 on old, no loops) before moving to the next.
+
+---
+
+## 41. Part 2 re-verification found and fixed a real chain-title bug: category-leading chains duplicated "Rugs"
+
+Per the task's own instruction, re-tested §35/§38's `append_handmade_rugs_suffix()` fix against all 6 renamed categories combined with a chained attribute filter — **this surfaced a real, previously-latent bug**, not just a clean re-confirmation.
+
+**The bug:** `chain_title_text()` joins every chain segment's plain term name (category first, then attributes) into one string, then runs the *whole joined string* through `append_handmade_rugs_suffix()`, which only strips a trailing "Rug"/"Rugs" from the *end* of that string. Now that every style category's name ends in "Rugs" (per this task's renames), a category-leading chain puts that "Rugs" in the *middle* of the string once an attribute name follows it — out of reach of an end-of-string strip. Live before the fix: `/product-category/antique-persian-rugs/origin/tabriz/` → H1/title **"Antique Persian Rugs Tabriz Handmade Rugs"** (duplicate "Rugs"). Same shape confirmed on all 6 renamed categories via `curl`.
+
+**Not a new regression from this task — a pre-existing latent bug**, just never exercised before: the pre-rename `heritage-rug` term's name, "Newly Woven Heritage Rugs," already ended in "Rugs" and would have hit the identical bug in any category-leading chain (e.g. `/product-category/heritage-rug/origin/tabriz/`) — §35/§38's own live testing happened not to test a rug-ending category name combined with a chain (only bare-category and pure-attribute-chain cases were checked for that specific combination), so it went unnoticed until this task's renames made it true for every category at once.
+
+**Fix (`Shop.php`, `chain_title_text()`):** strip a trailing `\s+rugs?$` from **each individual chain segment's name** before joining them (not just once from the final joined string) — so a rug-ending category name is normalized before it ever ends up mid-string. `append_handmade_rugs_suffix()` itself, and every other call site (`bare_archive_title_text()`), is unchanged.
+
+**Verified live via `curl` after deploying:**
+- All 6 category-leading chains (one attribute each): `antique-persian-rugs/origin/tabriz` → **"Antique Persian Tabriz Handmade Rugs"**; `kilim-persian-rugs/color/red` → **"Kilim Persian Red Handmade Rugs"**; `heritage-rugs/shape/rectangle` → **"Heritage Rectangle Handmade Rugs"**; `patina-rugs/origin/senneh` → **"Patina Senneh Handmade Rugs"**; `modern-persian-rugs/color/blue` → **"Modern Persian Blue Handmade Rugs"**; `vintage-persian-rugs/origin/tabriz` → **"Vintage Persian Tabriz Handmade Rugs"** — zero duplicate "Rugs" in any H1 or `<title>`, both always matching each other.
+- Regression-checked every other page shape this function touches, all still correct: bare category (`antique-persian-rugs/` → "Antique Persian Handmade Rugs"), pure attribute chain with no category (`/origin/tabriz/color/black/` → "Tabriz Black Handmade Rugs"), single attribute page (`/color/red/` → "Red Handmade Rugs"), and a 3-deep category+2-attribute chain (`/product-category/heritage-rugs/origin/tabriz/color/red/` → "Heritage Tabriz Red Handmade Rugs").
+
+Deployed via SFTP (paramiko): `App/Controller/Shop.php`. Committed to git alongside this log entry.

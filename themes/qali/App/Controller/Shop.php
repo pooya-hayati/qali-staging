@@ -1810,7 +1810,7 @@ class Shop
 
     /**
      * H1/title text for a chain: term names in URL order + " Handmade Rugs", e.g. "Tabriz Red
-     * Rectangle Handmade Rugs", or "Colorful Vintage Tabriz Blue Rectangle Handmade Rugs" for a
+     * Rectangle Handmade Rugs", or "Vintage Persian Tabriz Blue Rectangle Handmade Rugs" for a
      * category-leading chain. Only ever non-empty on an actual chain page (2+ segments in
      * whichever of self::$category_chain_terms / self::$chain_terms is active — same precedence
      * and same reason as chain_breadcrumb_links()) — a plain single-attribute or bare-category
@@ -1818,6 +1818,16 @@ class Shop
      * uses each entry's plain term ->name (not a category's curated `seo_title` meta override)
      * even for the leading category segment, since that override is meant to replace a bare
      * category page's whole H1, not to be a prefix glued onto a generated attribute list.
+     *
+     * Strips a trailing "Rug"/"Rugs" from every individual segment's name (not just the final
+     * joined string) before joining — since every style category was renamed to end in "Rugs"
+     * (e.g. "Antique Persian Rugs"), a category-leading chain would otherwise land that "Rugs"
+     * in the *middle* of the combined string once an attribute name follows it, where
+     * append_handmade_rugs_suffix()'s end-of-string strip can never reach it: "Antique Persian
+     * Rugs Tabriz Handmade Rugs" instead of "Antique Persian Tabriz Handmade Rugs". Confirmed
+     * live this was already a latent bug for any old rug-flavored category name in a chain (e.g.
+     * the pre-rename "Newly Woven Heritage Rugs"), just never exercised until every category name
+     * ended in Rugs at once.
      */
     public static function chain_title_text()
     {
@@ -1829,7 +1839,7 @@ class Shop
             return '';
         }
         $names = array_map(function ($entry) {
-            return $entry['term']->name;
+            return preg_replace('/\s+rugs?$/i', '', $entry['term']->name);
         }, $chain);
         return self::append_handmade_rugs_suffix(implode(' ', $names));
     }
