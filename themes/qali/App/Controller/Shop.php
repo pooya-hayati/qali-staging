@@ -1845,6 +1845,39 @@ class Shop
     }
 
     /**
+     * Per-term H1/title override for the 13 pa_design terms other than "Modern" — a basic H1
+     * hygiene pass only (task-scoped: single-attribute page text, no chips, no chain/combination
+     * URLs, no other pa_* dimension touched). "Modern" is deliberately excluded entirely (not
+     * just given the default formula) because it collides in name with the "Modern Persian Rugs"
+     * product category, pending a separate rename decision with the client — returning null here
+     * leaves is_tax($attribute_taxonomies)'s generic append_handmade_rugs_suffix() path
+     * (term name + " Handmade Rugs") exactly as it was for /design/modern/ before this change.
+     *
+     * Lookup/config approach (matches how curated per-term data is stored elsewhere in this file,
+     * e.g. color_swatch_for_term()'s hex map): $overrides holds only terms whose H1 deviates from
+     * the "{Term} Persian Rug" default — currently just "Prayer" (reversed to "Persian Prayer
+     * Rug" per keyword research showing real search volume for that word order, not the default's).
+     * Every other term falls through to the default formula, so adding a future pa_design term
+     * needs no code change unless it also needs a non-default word order.
+     */
+    private static function pa_design_h1_text(WP_Term $term)
+    {
+        if ($term->slug === 'modern') {
+            return null;
+        }
+
+        $overrides = [
+            'prayer' => 'Persian Prayer Rug',
+        ];
+
+        if (isset($overrides[$term->slug])) {
+            return $overrides[$term->slug];
+        }
+
+        return $term->name . ' Persian Rug';
+    }
+
+    /**
      * H1/title text for a bare (non-chained) product_cat page or a single, non-chained pa_*
      * attribute archive — the two cases header-shop.php's own $category_term / $attribute_term
      * branches already detect. Mirrors chain_title_text()'s own chain-vs-not gating exactly (a
@@ -1860,7 +1893,8 @@ class Shop
      * append_handmade_rugs_suffix() would otherwise strip that trailing word and re-append
      * " Handmade Rugs", turning the already-correct "Antique Persian Rugs" into "Antique Persian
      * Handmade Rugs" — confirmed live at product-category/antique-persian-rugs/ before this fix.
-     * pa_* attribute terms are untouched below; none of them are named with a trailing Rug/Rugs.
+     * pa_* attribute terms are untouched below, except pa_design's per-term overrides — see
+     * pa_design_h1_text().
      */
     public static function bare_archive_title_text()
     {
@@ -1883,6 +1917,12 @@ class Shop
         if (is_tax(self::attribute_taxonomies())) {
             $term = get_queried_object();
             if ($term instanceof WP_Term) {
+                if ($term->taxonomy === 'pa_design') {
+                    $custom = self::pa_design_h1_text($term);
+                    if ($custom !== null) {
+                        return $custom;
+                    }
+                }
                 return self::append_handmade_rugs_suffix($term->name);
             }
         }

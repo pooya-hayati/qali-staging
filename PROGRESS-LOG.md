@@ -940,3 +940,27 @@ Deployed via SFTP (paramiko): `App/Controller/Shop.php`. Committed to git alongs
 - `php -l` clean on `Shop.php`.
 
 Deployed via SFTP (paramiko): `App/Controller/Shop.php`. Committed to git alongside this log entry.
+
+---
+
+## 43. Added: corrected H1s for 13 pa_design terms (basic hygiene only — no chip/chain investment)
+
+**Task premise check:** the task asked to reuse "the same dimension-specific H1 config pattern established for pa_origin/pa_color/pa_shape/pa_size in a previous session." No such pattern exists — checked `Shop.php` and this log; every `pa_*` attribute taxonomy (`origin`/`color`/`shape`/`size`/`design`/etc.) has always shared one single generic formula, `bare_archive_title_text()`'s `is_tax($attribute_taxonomies)` branch → `{term name}` + `append_handmade_rugs_suffix()` → "{Term} Handmade Rugs" (confirmed live pre-change: `/origin/tabriz/` → "Tabriz Handmade Rugs", `/design/floral/` → "Floral Handmade Rugs", same shape on `pa_shape`/`pa_color`). No per-dimension or per-term config/lookup existed anywhere for any of the four. This didn't block the task — the requested end-state (exact H1 text per term, config-driven) was fully specified regardless — but flagging since a future task referencing this "existing pattern" should know it means "the generic suffix formula," not a lookup table.
+
+**Change (`Shop.php`):** added `pa_design_h1_text(WP_Term $term)` — a small lookup/config function, not per-term hardcoded strings in the branching logic itself:
+- Returns `null` for `slug === 'modern'`, which is checked first at the branch call site and, when null, falls through unchanged to the existing generic `append_handmade_rugs_suffix()` path — so `/design/modern/` keeps rendering exactly as before ("Modern Handmade Rugs"). Deliberately excluded per the task: "Modern" collides with the "Modern Persian Rugs" product category name, pending a separate client decision on renaming it — out of scope for this pass entirely, not given a formula of its own.
+- An `$overrides` map holds only terms whose H1 deviates from the default formula — currently just `'prayer' => 'Persian Prayer Rug'` (reversed word order, per keyword research showing real search volume there that the default order lacked).
+- Every other term (13 total, all except Modern) falls through to the default `"{$term->name} Persian Rug"`.
+- Wired into `bare_archive_title_text()`'s existing `is_tax($attribute_taxonomies)` branch, gated on `$term->taxonomy === 'pa_design'` — every other `pa_*` taxonomy (`origin`, `color`, `shape`, `size`, etc.) is completely untouched and still uses the generic suffix formula.
+- No chip, chain, or combination-URL code touched — `chain_title_text()`, the "suggested next filter" chip row (`next-filter-chip`, from an earlier, unrelated task), and `build_filter_query_args()` are all unmodified. `pa_design` remains a plain standalone sidebar filter with just a corrected H1, exactly as scoped.
+
+**Verified live** via `curl` after deploying:
+- All 13: `afshan` → "Afshan Persian Rug", `floral` → "Floral Persian Rug", `garden` → "Garden Persian Rug", `gul` → "Gul Persian Rug", `herati` → "Herati Persian Rug", `medallion` → "Medallion Persian Rug", `paisley` → "Paisley Persian Rug", `panel` → "Panel Persian Rug", `plain` → "Plain Persian Rug", `plain-floral` → "Plain Floral Persian Rug", `striped` → "Striped Persian Rug", `tree-of-life` → "Tree Of Life Persian Rug", `vase` → "Vase Persian Rug" — H1 and `<title>` both correct.
+- `prayer` → "Persian Prayer Rug" (H1 and `<title>` both, reversed order confirmed).
+- `modern` → still "Modern Handmade Rugs" (H1 and `<title>`), byte-identical to before this change.
+- `og:description`/meta description on `/design/floral/` still pulling the full native term description (Design Philosophy/Story/Interior Pairing copy) — untouched, confirmed present and unchanged in shape.
+- No `next-filter-chip`/chain markup was *added* — the existing chip row present on `/design/floral/` predates this task (commit `33fd566`, applies to all `pa_*` archive pages already) and this change's diff (`git diff --stat`: 41 insertions/1 deletion, all inside `bare_archive_title_text()`/the new helper) touches no chip- or chain-related code.
+- Regression-checked other `pa_*` dimensions unaffected: `/origin/tabriz/` → "Tabriz Handmade Rugs", `/shape/rectangle/` → "Rectangle Handmade Rugs", `/color/red/` → "Red Handmade Rugs", `/size/large/` → "Large Handmade Rugs" — all unchanged from before this task.
+- Server's `debug.log` size/mtime unchanged post-deploy (387,084,368 bytes, last modified 2026-08-24) — zero new entries. `php -l` clean on `Shop.php`. No browser-automation tool was available in this environment to check console errors directly; verified via HTTP response inspection instead (no injected PHP notice/warning text in any fetched page, which WP would emit inline if `WP_DEBUG_DISPLAY` were triggering one).
+
+Deployed via SFTP (paramiko): `App/Controller/Shop.php`. Committed to git alongside this log entry.
