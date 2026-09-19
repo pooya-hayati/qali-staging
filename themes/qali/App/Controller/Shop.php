@@ -1854,6 +1854,13 @@ class Shop
      * meta override when set (same lookup header-shop.php's H1 used before this existed), falling
      * back to the term's own name — either way run through append_handmade_rugs_suffix() so the
      * H1 and <title> (via chain_title(), which calls this too) always match.
+     *
+     * Exception: a product_cat base that already ends in "Rug"/"Rugs" (every style category does,
+     * post-rename — "Antique Persian Rugs" etc.) is returned as-is, with no suffix pass at all.
+     * append_handmade_rugs_suffix() would otherwise strip that trailing word and re-append
+     * " Handmade Rugs", turning the already-correct "Antique Persian Rugs" into "Antique Persian
+     * Handmade Rugs" — confirmed live at product-category/antique-persian-rugs/ before this fix.
+     * pa_* attribute terms are untouched below; none of them are named with a trailing Rug/Rugs.
      */
     public static function bare_archive_title_text()
     {
@@ -1866,6 +1873,9 @@ class Shop
             if ($term instanceof WP_Term) {
                 $seo_title = get_term_meta($term->term_id, 'seo_title', true);
                 $base = ($seo_title !== '') ? $seo_title : $term->name;
+                if (preg_match('/\s+rugs?$/i', $base)) {
+                    return $base;
+                }
                 return self::append_handmade_rugs_suffix($base);
             }
         }

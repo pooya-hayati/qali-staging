@@ -917,3 +917,26 @@ Per the task's own instruction, re-tested §35/§38's `append_handmade_rugs_suff
 - Regression-checked every other page shape this function touches, all still correct: bare category (`antique-persian-rugs/` → "Antique Persian Handmade Rugs"), pure attribute chain with no category (`/origin/tabriz/color/black/` → "Tabriz Black Handmade Rugs"), single attribute page (`/color/red/` → "Red Handmade Rugs"), and a 3-deep category+2-attribute chain (`/product-category/heritage-rugs/origin/tabriz/color/red/` → "Heritage Tabriz Red Handmade Rugs").
 
 Deployed via SFTP (paramiko): `App/Controller/Shop.php`. Committed to git alongside this log entry.
+
+---
+
+## 42. Investigated and fixed: bare category H1 wrongly carried "Handmade Rugs" (task premise was wrong — not a stale meta field)
+
+**Task as given:** find and fix a "Category Title (H1)" Meta Box field alleged to hold stale content ending in "Handmade Rugs" for all 6 renamed style categories, by overwriting that stored field with the plain category name.
+
+**Investigation found the premise didn't match the code or the live site:**
+- The field exists — `seo_title` (labeled "Category Title (H1)" in wp-admin), registered on the `standard-product_cat-seo` Meta Box group, `product_cat` only (`Shop.php:504-520`). `header-shop.php` doesn't read it directly; it goes through `Shop::bare_archive_title_text()` (`Shop.php:1858`), which reads `seo_title`, falls back to the term name if empty, and — this is the part the task missed — always pipes the result through `append_handmade_rugs_suffix()` (added deliberately in §35/entry-5c0d541, still active and by design for every other page shape per §41's own regression checks).
+- `append_handmade_rugs_suffix()` unconditionally strips a trailing "Rug"/"Rugs" word and re-appends `" Handmade Rugs"` — so even a perfectly-named `seo_title` of "Antique Persian Rugs" would have been stripped back down to "Antique Persian" and re-suffixed to "Antique Persian Handmade Rugs" again. Editing the stored field, as instructed, would not have fixed anything.
+- Confirmed live before touching anything: `product-category/antique-persian-rugs/` rendered `<h1>Antique Persian Handmade Rugs</h1>`. This also disproves the "stale field" theory directly — a stale value already ending in "Handmade Rugs" would double up under the strip-then-suffix logic ("...Handmade **Handmade** Rugs"), which isn't what's live. The far more likely explanation is `seo_title` was simply never set for these terms, and the term's own (renamed) name is what's hitting the suffix logic.
+- Checked pa_* attribute taxonomies for an equivalent field (task's step 3): none exists. Only `product_cat` has `seo_title`; pa_color/pa_design/pa_size etc. have their own unrelated fields (Color/Image/Subtitle) and no H1 override.
+
+**Surfaced this to the user rather than executing the literal instruction** (would not have fixed the bug and could have caused a false "done" report) — asked how the 6 categories' H1s should render given the suffix is intentional code, not stray data. User chose: drop the suffix for categories whose name already ends in Rug/Rugs, so the H1 is exactly the category name.
+
+**Fix (`Shop.php`, `bare_archive_title_text()`, product_cat branch only):** if the resolved base (seo_title override or term name) already matches `/\s+rugs?$/i`, return it as-is — skip `append_handmade_rugs_suffix()` entirely for that case. Chain pages (`chain_title_text()`) and pa_* bare attribute pages are untouched; the `seo_title` field itself was left empty (no term-meta write) since the term name is already correct and the code now respects that directly.
+
+**Verified live** via `curl` after deploying:
+- All 6: `antique-persian-rugs` → "Antique Persian Rugs", `vintage-persian-rugs` → "Vintage Persian Rugs", `modern-persian-rugs` → "Modern Persian Rugs", `kilim-persian-rugs` → "Kilim Persian Rugs", `heritage-rugs` → "Heritage Rugs", `patina-rugs` → "Patina Rugs" — H1 and `<title>` both correct, no "Handmade" anywhere.
+- Regression-checked unaffected shapes still correct: pa_* bare attribute page (`/origin/tabriz/` → "Tabriz Handmade Rugs", suffix intact as intended) and a category-leading chain (`/product-category/antique-persian-rugs/origin/tabriz/` → "Antique Persian Tabriz Handmade Rugs", matches §41, no regression).
+- `php -l` clean on `Shop.php`.
+
+Deployed via SFTP (paramiko): `App/Controller/Shop.php`. Committed to git alongside this log entry.
