@@ -964,3 +964,29 @@ Deployed via SFTP (paramiko): `App/Controller/Shop.php`. Committed to git alongs
 - Server's `debug.log` size/mtime unchanged post-deploy (387,084,368 bytes, last modified 2026-08-24) — zero new entries. `php -l` clean on `Shop.php`. No browser-automation tool was available in this environment to check console errors directly; verified via HTTP response inspection instead (no injected PHP notice/warning text in any fetched page, which WP would emit inline if `WP_DEBUG_DISPLAY` were triggering one).
 
 Deployed via SFTP (paramiko): `App/Controller/Shop.php`. Committed to git alongside this log entry.
+
+---
+
+## 44. Added: corrected per-dimension H1s for pa_origin, pa_color, pa_shape, pa_size (§43's note corrected — this was never actually built before now)
+
+**Correction to §43's closing note:** that entry flagged "no per-dimension H1 pattern exists for pa_origin/pa_color/pa_shape/pa_size" as a premise mismatch in the *task description*, but left open whether dimension-specific formulas from keyword research had been designed and just not wired up. Confirmed this task: they hadn't — before this entry, all four taxonomies shared the one generic `{Term} Handmade Rugs` formula (`append_handmade_rugs_suffix()`), same as `pa_design` before §43. Only `product_cat` (§35/§36/§42) and `pa_design` (§43) had real per-dimension H1 logic. This entry is the first time pa_origin/pa_color/pa_shape/pa_size get their own formulas.
+
+**Change (`Shop.php`):** added four new functions, same lookup/config shape as §43's `pa_design_h1_text()`, each taking the queried `WP_Term` and returning the H1 string:
+- `pa_origin_h1_text()` — `"{Origin} Rugs"`, no "Persian" at all (origin name alone is the strongest anchor per keyword research). No exceptions; 26/26 terms use the plain formula.
+- `pa_color_h1_text()` — `"{Color} Persian Rug"`, color name first (this order significantly outperformed "Persian {Color} Rug" in research, e.g. Grey: 260 vs 70 search volume). No exceptions; all 15 color terms.
+- `pa_shape_h1_text()` — `"{Shape} Persian Rug"`, shape first, same word-order rule as color. "Rectangle" has no real search-volume signal either way but uses the same formula as a consistent placeholder rather than a special case. All 5 shape terms.
+- `pa_size_h1_text()` — `"{Size} Persian Rug"` (size first) for Extra Large/Large/Medium/Small, with a single `$overrides`-map exception for `runner` → `"Persian Runner Rug"` (Persian first — the one size term that tested better reversed, same pattern as `pa_design_h1_text()`'s "Prayer" exception).
+
+`bare_archive_title_text()`'s `is_tax($attribute_taxonomies)` branch, previously a single `if ($term->taxonomy === 'pa_design')` check, is now a `switch` dispatching to whichever of the 5 formula functions matches the term's taxonomy (`pa_design`/`pa_origin`/`pa_color`/`pa_shape`/`pa_size`); any other `pa_*` taxonomy (`pa_feel`, `pa_material`, `pa_thickness`) falls through unchanged to the original generic `append_handmade_rugs_suffix()` formula, exactly as before this task.
+
+**Scope respected — chain/chip logic untouched:** `chain_title_text()` (combined-page H1 for `/origin/tabriz/color/red/`-style URLs) was not modified — it still joins each segment's raw `->name` and appends the generic "Handmade Rugs" suffix, completely independent of the new single-term formula functions (it never called `bare_archive_title_text()` or the new functions to begin with). The "suggested next filter" chip row (`next-filter-chip`, §33-era) reads term data directly and doesn't call any H1 function either. Neither was expected to change, and neither did.
+
+**Verified live** via `curl` after deploying:
+- Required samples: `/origin/tabriz/` → "Tabriz Rugs", `/color/grey/` → "Grey Persian Rug", `/shape/runner/` → "Runner Persian Rug", `/size/large/` → "Large Persian Rug", `/size/runner/` → "Persian Runner Rug" (the exception) — H1 and `<title>` both match on all 5.
+- Full sweep, every term in each taxonomy (via each `pa_*-sitemap.xml`): all 26 `pa_origin` terms → `"{Name} Rugs"`; all 15 `pa_color` terms → `"{Name} Persian Rug"`; all 5 `pa_shape` terms → `"{Name} Persian Rug"`; all 5 `pa_size` terms → `"{Name} Persian Rug"` except `runner` → `"Persian Runner Rug"` — zero mismatches.
+- Chained/combination pages unaffected, same "Handmade Rugs" combined format as before this task: `/origin/tabriz/color/red/` → "Tabriz Red Handmade Rugs", `/color/red/shape/round/` → "Red Round Handmade Rugs", `/product-category/antique-persian-rugs/origin/tabriz/` → "Antique Persian Tabriz Handmade Rugs", a 3-deep chain (`/origin/tabriz/color/red/shape/rectangle/`) → "Tabriz Red Rectangle Handmade Rugs" — H1 and `<title>` match in every case, no regression from §41's chain-title fix.
+- `next-filter-chip` markup still present and unchanged on `/origin/tabriz/` and `/color/red/` (pre-existing, §33-era — not touched by this diff).
+- `og:description` on `/origin/tabriz/` and `/color/grey/` still pulling the full native term description, untouched.
+- Server's `debug.log` size/mtime unchanged post-deploy (387,084,368 bytes, last modified 2026-08-24) — zero new entries. `php -l` clean on `Shop.php`. No browser-automation tool available in this environment; verified via HTTP response inspection as in §43 (no injected PHP notice/warning text on any fetched page).
+
+Deployed via SFTP (paramiko): `App/Controller/Shop.php`. Committed to git alongside this log entry.

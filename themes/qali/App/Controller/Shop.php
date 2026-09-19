@@ -1878,6 +1878,56 @@ class Shop
     }
 
     /**
+     * Per-term H1/title formula for pa_origin — "{Origin} Rugs", no "Persian" suffix at all: per
+     * keyword research, the origin name alone is the strongest anchor and adding "Persian" added
+     * nothing. No per-term exceptions currently — every origin term uses the plain formula, but
+     * kept as its own function (matching pa_design_h1_text()'s shape) so a future exception needs
+     * no call-site change, just an $overrides entry here.
+     */
+    private static function pa_origin_h1_text(WP_Term $term)
+    {
+        return $term->name . ' Rugs';
+    }
+
+    /**
+     * Per-term H1/title formula for pa_color — "{Color} Persian Rug", color name first: per
+     * keyword research this word order significantly outperformed "Persian {Color} Rug" (e.g.
+     * Grey: 260 vs 70 search volume). Applies to all 15 color terms, no exceptions.
+     */
+    private static function pa_color_h1_text(WP_Term $term)
+    {
+        return $term->name . ' Persian Rug';
+    }
+
+    /**
+     * Per-term H1/title formula for pa_shape — "{Shape} Persian Rug", shape name first, same
+     * word-order rule as pa_color. "Rectangle" has no meaningful search volume either way — still
+     * uses the same formula as a consistent placeholder rather than a special case.
+     */
+    private static function pa_shape_h1_text(WP_Term $term)
+    {
+        return $term->name . ' Persian Rug';
+    }
+
+    /**
+     * Per-term H1/title formula for pa_size — "{Size} Persian Rug" (size first) for every term
+     * except "Runner", the one size term where "Persian {Size} Rug" (Persian first) tested better
+     * per keyword research — same $overrides-map shape as pa_design_h1_text()'s "Prayer" exception.
+     */
+    private static function pa_size_h1_text(WP_Term $term)
+    {
+        $overrides = [
+            'runner' => 'Persian Runner Rug',
+        ];
+
+        if (isset($overrides[$term->slug])) {
+            return $overrides[$term->slug];
+        }
+
+        return $term->name . ' Persian Rug';
+    }
+
+    /**
      * H1/title text for a bare (non-chained) product_cat page or a single, non-chained pa_*
      * attribute archive — the two cases header-shop.php's own $category_term / $attribute_term
      * branches already detect. Mirrors chain_title_text()'s own chain-vs-not gating exactly (a
@@ -1893,8 +1943,11 @@ class Shop
      * append_handmade_rugs_suffix() would otherwise strip that trailing word and re-append
      * " Handmade Rugs", turning the already-correct "Antique Persian Rugs" into "Antique Persian
      * Handmade Rugs" — confirmed live at product-category/antique-persian-rugs/ before this fix.
-     * pa_* attribute terms are untouched below, except pa_design's per-term overrides — see
-     * pa_design_h1_text().
+     * pa_* attribute terms below dispatch to a per-dimension formula function
+     * (pa_design_h1_text()/pa_origin_h1_text()/pa_color_h1_text()/pa_shape_h1_text()/
+     * pa_size_h1_text()) for the 5 taxonomies that have one; any other pa_* taxonomy (pa_feel,
+     * pa_material, pa_thickness, etc.) still falls through to the original generic
+     * append_handmade_rugs_suffix() formula, unchanged.
      */
     public static function bare_archive_title_text()
     {
@@ -1917,11 +1970,21 @@ class Shop
         if (is_tax(self::attribute_taxonomies())) {
             $term = get_queried_object();
             if ($term instanceof WP_Term) {
-                if ($term->taxonomy === 'pa_design') {
-                    $custom = self::pa_design_h1_text($term);
-                    if ($custom !== null) {
-                        return $custom;
-                    }
+                switch ($term->taxonomy) {
+                    case 'pa_design':
+                        $custom = self::pa_design_h1_text($term);
+                        if ($custom !== null) {
+                            return $custom;
+                        }
+                        break;
+                    case 'pa_origin':
+                        return self::pa_origin_h1_text($term);
+                    case 'pa_color':
+                        return self::pa_color_h1_text($term);
+                    case 'pa_shape':
+                        return self::pa_shape_h1_text($term);
+                    case 'pa_size':
+                        return self::pa_size_h1_text($term);
                 }
                 return self::append_handmade_rugs_suffix($term->name);
             }
