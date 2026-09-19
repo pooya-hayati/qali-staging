@@ -1013,3 +1013,30 @@ Follow-up to §42 (product_cat) and §43/§44 (pa_design and pa_origin/color/sha
 This closes the last known instance of the "Handmade Rugs" suffix bug across product_cat (§42), pa_design (§43), pa_origin/color/shape/size (§44), and now chained/combination URLs (§45) — every H1/`<title>` code path in `Shop.php` that generates archive titles has now been reviewed and corrected.
 
 Deployed via SFTP (paramiko): `App/Controller/Shop.php`. Committed to git alongside this log entry.
+
+---
+
+## 46. Added: "| 100% Genuine [Persian]" `<title>`-only suffix, shared across every product_cat/pa_*/chain title
+
+**Two premise issues surfaced and resolved with the user before writing any code:**
+- The task's message was truncated mid-sentence on the "- Qali" question ("...decide whether '- Qali' should still appear... or"). Asked directly — user chose to keep `" - Qali"` at the very end, with the new suffix inserted before it (e.g. `"Grey Persian Rug | 100% Genuine - Qali"`), not dropped or reordered.
+- The task described chained origin+color pages (`/origin/tabriz/color/red/`) as already having "H1/title decoupling from a previous session" that reorders the `<title>` to color-first ("Red Tabriz Rugs"). Checked the code: no such thing exists — `chain_title_text()` is the one function generating both H1 and `<title>` for every chain (confirmed identical live output for both, "Tabriz Red Rugs", in §45's own verification moments earlier this session), and `CHAIN_DIMENSION_ORDER` (§ several sessions back) fixes canonical URL segment order as origin-before-color, not the reverse. Asked the user rather than inventing a title-only reordering scheme that would have silently reintroduced the H1/`<title>` drift §45 just eliminated — user confirmed: use the existing URL-order text as-is, just append the new suffix to it.
+- Also checked the task's "Homepage: 'Persian Rugs' → ..." example against the live site before treating it as in-scope: the real homepage `<title>` is `"Home - Qali"`, not "Persian Rugs" — confirms that example was illustrating the suffix *rule*, not asking to touch the actual homepage/shop-page title (which live outside `chain_title()`'s taxonomy-archive gating entirely). Left both untouched, matching the task's own explicit scope statement ("single-attribute AND chained").
+
+**Change (`Shop.php`):** added `append_genuine_persian_suffix($text)` — the one shared function the task asked for. `stripos($text, 'persian') !== false` → append `' | 100% Genuine'`; otherwise append `' | 100% Genuine Persian'`. Wired into `chain_title()` (the single `wpseo_title` filter callback that already produces every product_cat/pa_*/chain `<title>` — the same function §45 fixed for the "Handmade Rugs" bug), inserted between the base text and the existing `' - ' . get_bloginfo('name')` suffix. **H1 is untouched** — `header-shop.php` reads `chain_title_text()`/`bare_archive_title_text()` directly, never `chain_title()` or the new suffix function, so this is genuinely `<title>`-only as scoped.
+
+**Verified live** via `curl` after deploying, covering every example from the task plus regression checks:
+- `/product-category/antique-persian-rugs/` → title "Antique Persian Rugs | 100% Genuine - Qali" (already had Persian), H1 unchanged "Antique Persian Rugs".
+- `/origin/tabriz/` → title "Tabriz Rugs | 100% Genuine Persian - Qali" (no Persian in base), H1 unchanged "Tabriz Rugs".
+- `/color/grey/` → title "Grey Persian Rug | 100% Genuine - Qali", H1 unchanged.
+- `/design/floral/` → title "Floral Persian Rug | 100% Genuine - Qali", H1 unchanged.
+- `/origin/tabriz/color/red/` → title "Tabriz Red Rugs | 100% Genuine Persian - Qali" (URL-order text, per the clarified decision), H1 unchanged "Tabriz Red Rugs".
+- `/origin/tabriz/color/red/shape/round/` (3-way) → title "Tabriz Red Round Rugs | 100% Genuine Persian - Qali".
+- `/product-category/antique-persian-rugs/origin/tabriz/` (category-leading) → title "Antique Persian Tabriz Rugs | 100% Genuine - Qali" (already had Persian).
+- `/size/runner/` (the H1 word-order exception, "Persian Runner Rug") → title "Persian Runner Rug | 100% Genuine - Qali" — correctly deduped since the base already has Persian.
+- `/design/modern/` (excluded from the design formula, still "Modern Handmade Rugs") and `/feel/soft-and-comfy/` (a taxonomy with no per-dimension formula) → both correctly get the full "| 100% Genuine Persian" suffix, since neither base contains "Persian".
+- Homepage (`/`) and shop archive (`/products/`) confirmed unaffected: "Home - Qali" and "Products - Qali", unchanged.
+- `next-filter-chip` markup and `og:description` both unchanged on a checked page.
+- Server's `debug.log` size/mtime unchanged post-deploy (387,084,368 bytes, last modified 2026-08-24) — zero new entries. `php -l` clean on `Shop.php`. No browser-automation tool available in this environment; verified via HTTP response inspection (no injected PHP notice/warning text on any fetched page).
+
+Deployed via SFTP (paramiko): `App/Controller/Shop.php`. Committed to git alongside this log entry.

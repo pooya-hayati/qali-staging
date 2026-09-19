@@ -2004,6 +2004,28 @@ class Shop
         return '';
     }
 
+    /**
+     * Appends the finalized "| 100% Genuine[ Persian]" <title>-only suffix. Single shared call
+     * site (chain_title(), below) so every <title>-generating page — product_cat,
+     * every pa_* single-term page (via bare_archive_title_text()'s per-dimension formulas), and
+     * every chained/combination page (via chain_title_text()) — gets this from one place; none of
+     * their H1 output (header-shop.php reads the same *_title_text() functions directly, never
+     * this one) is touched.
+     *
+     * If $text already contains "Persian" anywhere (case-insensitive — every current base text
+     * that has it uses the capitalized word, e.g. "Antique Persian Rugs"/"Grey Persian Rug", but
+     * matching case-insensitively is no less correct and doesn't depend on that staying true),
+     * the redundant second "Persian" is dropped and only "| 100% Genuine" is appended; otherwise
+     * the full "| 100% Genuine Persian" (e.g. "Tabriz Rugs", which has no "Persian" of its own).
+     */
+    private static function append_genuine_persian_suffix($text)
+    {
+        if (stripos($text, 'persian') !== false) {
+            return $text . ' | ' . __('100% Genuine', LANG_STRING);
+        }
+        return $text . ' | ' . __('100% Genuine Persian', LANG_STRING);
+    }
+
     public function chain_title($title)
     {
         $text = self::chain_title_text();
@@ -2013,7 +2035,7 @@ class Shop
         if ($text === '') {
             return $title;
         }
-        return $text . ' - ' . get_bloginfo('name');
+        return self::append_genuine_persian_suffix($text) . ' - ' . get_bloginfo('name');
     }
 
     /**
