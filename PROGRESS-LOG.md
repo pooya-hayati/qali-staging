@@ -990,3 +990,26 @@ Deployed via SFTP (paramiko): `App/Controller/Shop.php`. Committed to git alongs
 - Server's `debug.log` size/mtime unchanged post-deploy (387,084,368 bytes, last modified 2026-08-24) — zero new entries. `php -l` clean on `Shop.php`. No browser-automation tool available in this environment; verified via HTTP response inspection as in §43 (no injected PHP notice/warning text on any fetched page).
 
 Deployed via SFTP (paramiko): `App/Controller/Shop.php`. Committed to git alongside this log entry.
+
+---
+
+## 45. Fixed: chain_title_text() was appending "Handmade Rugs" instead of plain "Rugs" — closes the last remaining instance of this suffix bug
+
+Follow-up to §42 (product_cat) and §43/§44 (pa_design and pa_origin/color/shape/size): the one remaining place the wrong suffix logic still lived was `chain_title_text()` — the combined H1/`<title>` for chained/combination URLs (`/origin/tabriz/color/red/`, category-leading chains, etc.). It piped its joined term-name string through the same `append_handmade_rugs_suffix()` used by bare single-term pages, so a chain like `/origin/tabriz/color/red/` rendered "Tabriz Red **Handmade** Rugs" — visible in §44's own verification output, which recorded that exact text as the (at-the-time correct-looking) expected result without questioning it, since fixing chains wasn't in scope for that task.
+
+**Architecture decision (per this task):** a chain's H1 should be the active term names in URL order + a single trailing "Rugs" — no "Persian", no "Handmade". Unlike a bare single-term page (where §43/§44 added dimension-specific "Persian"/"Handmade" formulas because one term alone needs help carrying SEO identity), a chain already combines multiple identity-carrying terms, so the combination itself is the identity — nothing extra should be injected.
+
+**Change (`Shop.php`, `chain_title_text()`):** removed the `append_handmade_rugs_suffix()` call. The existing per-segment `\s+rugs?$` strip (join-order term names, from §41) is unchanged. After joining, a defensive end-of-string `\s+rugs?$` check (mirrors §42's product_cat duplicate-"Rugs" guard) returns the joined string as-is if it already ends in Rug/Rugs; otherwise appends `' ' . __('Rugs', LANG_STRING)`. `append_handmade_rugs_suffix()` itself is untouched and still used by `bare_archive_title_text()`'s product_cat-suffix path and every `pa_*` taxonomy without its own per-dimension formula (`pa_feel`, `pa_material`, `pa_thickness`, etc.) — this fix is scoped to the chain function only, as instructed.
+
+**Verified live** via `curl` after deploying:
+- 2-way: `/origin/tabriz/color/red/` → **"Tabriz Red Rugs"** (H1 and `<title>` both; was "Tabriz Red Handmade Rugs").
+- 3-way: `/origin/tabriz/color/red/shape/round/` → **"Tabriz Red Round Rugs"**.
+- Category-leading: `/product-category/antique-persian-rugs/origin/tabriz/` → **"Antique Persian Tabriz Rugs"** — no duplicate "Rugs" (category name already ends in Rugs, still correctly de-duped by the §41 per-segment strip) and no "Handmade".
+- Single-term pages regression-checked, all byte-identical to §42/§43/§44's results, confirming this change is scoped to chains only: `/product-category/antique-persian-rugs/` → "Antique Persian Rugs", `/origin/tabriz/` → "Tabriz Rugs", `/color/grey/` → "Grey Persian Rug", `/shape/runner/` → "Runner Persian Rug", `/size/large/` → "Large Persian Rug", `/size/runner/` → "Persian Runner Rug", `/design/floral/` → "Floral Persian Rug", `/design/prayer/` → "Persian Prayer Rug", `/design/modern/` → "Modern Handmade Rugs" (unchanged, still excluded per §43).
+- `pa_feel`/`pa_material` (taxonomies with no per-dimension formula) still use the original generic suffix on their own bare pages: `/feel/soft-and-comfy/` → "Soft and Comfy Handmade Rugs", `/material/wool-cotton/` → "Wool-Cotton Handmade Rugs" — unaffected by this chain-only fix.
+- `next-filter-chip` markup and `og:description` both still present/unchanged on a chain page (`/origin/tabriz/color/red/`).
+- Server's `debug.log` size/mtime unchanged post-deploy (387,084,368 bytes, last modified 2026-08-24) — zero new entries. `php -l` clean on `Shop.php`. No browser-automation tool available in this environment; verified via HTTP response inspection (no injected PHP notice/warning text on any fetched page).
+
+This closes the last known instance of the "Handmade Rugs" suffix bug across product_cat (§42), pa_design (§43), pa_origin/color/shape/size (§44), and now chained/combination URLs (§45) — every H1/`<title>` code path in `Shop.php` that generates archive titles has now been reviewed and corrected.
+
+Deployed via SFTP (paramiko): `App/Controller/Shop.php`. Committed to git alongside this log entry.

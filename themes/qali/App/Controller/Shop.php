@@ -1809,25 +1809,32 @@ class Shop
     }
 
     /**
-     * H1/title text for a chain: term names in URL order + " Handmade Rugs", e.g. "Tabriz Red
-     * Rectangle Handmade Rugs", or "Vintage Persian Tabriz Blue Rectangle Handmade Rugs" for a
-     * category-leading chain. Only ever non-empty on an actual chain page (2+ segments in
-     * whichever of self::$category_chain_terms / self::$chain_terms is active — same precedence
-     * and same reason as chain_breadcrumb_links()) — a plain single-attribute or bare-category
-     * page has both arrays empty and is left to bare_archive_title_text() instead. Deliberately
-     * uses each entry's plain term ->name (not a category's curated `seo_title` meta override)
-     * even for the leading category segment, since that override is meant to replace a bare
-     * category page's whole H1, not to be a prefix glued onto a generated attribute list.
+     * H1/title text for a chain: term names in URL order + " Rugs", e.g. "Tabriz Red Rectangle
+     * Rugs", or "Antique Persian Tabriz Rugs" for a category-leading chain. Only ever non-empty
+     * on an actual chain page (2+ segments in whichever of self::$category_chain_terms /
+     * self::$chain_terms is active — same precedence and same reason as
+     * chain_breadcrumb_links()) — a plain single-attribute or bare-category page has both arrays
+     * empty and is left to bare_archive_title_text() instead. Deliberately uses each entry's
+     * plain term ->name (not a category's curated `seo_title` meta override) even for the
+     * leading category segment, since that override is meant to replace a bare category page's
+     * whole H1, not to be a prefix glued onto a generated attribute list.
+     *
+     * No "Persian" and no "Handmade" here, by design — unlike bare_archive_title_text()'s single-
+     * term formulas (pa_color/pa_shape/pa_size add "Persian", pa_design has per-term overrides,
+     * every bare pa_* page gets "Handmade Rugs"), a chain already combines multiple identity-
+     * carrying terms (an origin name, a category name, etc.) in URL order — the architecture
+     * decision is that combination alone is the H1's identity, with a single trailing "Rugs" and
+     * nothing else injected. (An earlier version of this function did append the same "Handmade
+     * Rugs" suffix as the single-term pages — e.g. "Tabriz Red Handmade Rugs" — which was wrong
+     * for chains specifically; fixed here.)
      *
      * Strips a trailing "Rug"/"Rugs" from every individual segment's name (not just the final
      * joined string) before joining — since every style category was renamed to end in "Rugs"
      * (e.g. "Antique Persian Rugs"), a category-leading chain would otherwise land that "Rugs"
-     * in the *middle* of the combined string once an attribute name follows it, where
-     * append_handmade_rugs_suffix()'s end-of-string strip can never reach it: "Antique Persian
-     * Rugs Tabriz Handmade Rugs" instead of "Antique Persian Tabriz Handmade Rugs". Confirmed
-     * live this was already a latent bug for any old rug-flavored category name in a chain (e.g.
-     * the pre-rename "Newly Woven Heritage Rugs"), just never exercised until every category name
-     * ended in Rugs at once.
+     * in the *middle* of the combined string once an attribute name follows it, out of reach of
+     * an end-of-string strip. A defensive end-of-string check is still run on the joined result
+     * (mirrors bare_archive_title_text()'s product_cat duplicate-"Rugs" guard) in case a future
+     * single-segment chain-like edge case ends the joined string in Rug/Rugs regardless.
      */
     public static function chain_title_text()
     {
@@ -1841,7 +1848,11 @@ class Shop
         $names = array_map(function ($entry) {
             return preg_replace('/\s+rugs?$/i', '', $entry['term']->name);
         }, $chain);
-        return self::append_handmade_rugs_suffix(implode(' ', $names));
+        $combined = implode(' ', $names);
+        if (preg_match('/\s+rugs?$/i', $combined)) {
+            return $combined;
+        }
+        return $combined . ' ' . __('Rugs', LANG_STRING);
     }
 
     /**
