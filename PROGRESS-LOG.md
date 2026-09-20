@@ -1060,3 +1060,31 @@ Two related fixes to `chain_title_text()` (the one function §45/§46 establishe
 - `php -l` clean on `Shop.php` before deploy.
 
 Deployed via SFTP (paramiko): `App/Controller/Shop.php`. Committed to git alongside this log entry.
+
+---
+
+## 48. Renamed "Kilim Persian Rugs" → "Persian Kilim Rugs" (term_id 401), avoiding a 2-hop redirect chain
+
+Word-order-only rename (matches the real industry term "Persian Kilim," same construction as "Turkish Kilim" — no keyword-volume difference claimed). Old: `kilim-persian-rugs`. New: `persian-kilim-rugs`. This category had already been renamed once before, in §40 (`kilim-rug` → `kilim-persian-rugs`, with a 301 already in place from that rename) — the whole point of this task was updating that existing redirect to skip the middle hop rather than layering a second redirect on top of it.
+
+**Blocked, then unblocked, mid-task:** the project's only mechanism for a DB-level change like this is the one-off SFTP-uploaded-PHP-script pattern used throughout §10/§39/§40 (no WP-CLI/SSH/REST here — REST confirmed `rest_api_disabled` back in §40 — and Claude in Chrome isn't connected in this Codespace). Claude Code's auto-mode safety classifier denied the *first* attempt to upload even a read-only diagnostic script to the site root ("Create RCE Surface") — this matches a restriction already recorded from 2026-09-06. Stopped and asked the user rather than working around it; user explicitly authorized the action, and the identical upload succeeded on retry with no other change. Noting this here in case the same block recurs on a future task — it is not a hard, unconditional deny, just one that needs the user's explicit go-ahead in the moment.
+
+**Read-only diagnostic first** (per this project's established pattern of dumping state before touching anything): confirmed live term_id 401, name "Kilim Persian Rugs", slug `kilim-persian-rugs`, empty `seo_title` meta (matches §40's finding), and exactly one existing Yoast redirect: `product-category/kilim-rug` → `product-category/kilim-persian-rugs` (301).
+
+**Mutation script, one request, three changes:**
+1. `wp_update_term(401, 'product_cat', ['name' => 'Persian Kilim Rugs', 'slug' => 'persian-kilim-rugs'])`.
+2. `update_term_meta(401, 'seo_title', 'Persian Kilim Rugs')` — same "keep the override field internally consistent" pattern §40 used for `heritage-rugs`; not strictly required (the plain term name already drives the H1/title via `bare_archive_title_text()`, and no per-category formula exists in `Shop.php` — grepped, zero "kilim" hits — so no code change/deploy was needed here at all) but matches the established convention.
+3. Read the existing `kilim-rug` redirect via `WPSEO_Redirect_Manager::get_redirect()`, then `update_redirect()` it in place to target `/product-category/persian-kilim-rugs/` directly (was `/product-category/kilim-persian-rugs/`) — this is the step that actually prevents the 2-hop chain, by repointing the *original* rule rather than leaving it as a stepping stone to a second rule. Then `create_redirect()` for a new `kilim-persian-rugs` → `persian-kilim-rugs` rule, so anything already linking the intermediate URL also still lands in one hop.
+
+Script echoed a JSON confirmation of every step (before/after term name+slug, `seo_title` after-write, both redirect-write results, and a final read-back of both rows) before being deleted; both the diagnostic and mutation scripts were removed via SFTP immediately after use and confirmed `404` afterward.
+
+**Verified live via `curl` — both redirects are single-hop, confirmed by reading the `Location` header directly (not `curl -L`, so a hidden second hop couldn't be masked):**
+- `/product-category/kilim-rug/` → `301` → `Location: https://dev.qali.art/product-category/persian-kilim-rugs/` (direct — was pointing at `kilim-persian-rugs` before this task).
+- `/product-category/kilim-persian-rugs/` → `301` → `Location: https://dev.qali.art/product-category/persian-kilim-rugs/` (the new stepping-stone redirect, also direct).
+- `/product-category/persian-kilim-rugs/` → `200`, H1 and `<title>` both **"Persian Kilim Rugs"** (title: `"Persian Kilim Rugs | 100% Genuine - Qali"`).
+- Chained URL under the new slug, `/product-category/persian-kilim-rugs/origin/tabriz/` → `200`, H1/`<title>` **"Persian Kilim Tabriz Rugs"** — correct §47 display order (Category, then Origin) applied automatically, no code change needed since `chain_title_text()` reads the term's live name.
+- Codebase grep for `kilim-persian-rugs` (any casing) across `themes/`/`modules/`: **zero hardcoded references**, before and after — confirms no nav/chip/chain code needed updating; category URLs are entirely slug-driven.
+- Sanity-checked that a chained URL under the *old* slug 404s rather than redirecting (`/product-category/kilim-persian-rugs/origin/tabriz/` → `404`) — confirmed this is pre-existing behavior identical on an already-renamed category from §40 (`/product-category/antique/origin/tabriz/` → also `404`), i.e. Yoast's redirect only matches the exact bare-category path, never a chain built on top of an old slug; not a regression from this task, out of scope to change.
+- Server's `debug.log` size unchanged post-change (387,084,368 bytes, same as §45's last recorded check) — zero new entries.
+
+Deployed: nothing to SFTP for this task (no `Shop.php`/theme file changed — the rename lives entirely in the DB). Committed PROGRESS-LOG.md, pushed to `origin/main`.
