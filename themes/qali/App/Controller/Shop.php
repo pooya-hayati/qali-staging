@@ -1809,24 +1809,46 @@ class Shop
     }
 
     /**
-     * H1/title text for a chain: term names in URL order + " Rugs", e.g. "Tabriz Red Rectangle
-     * Rugs", or "Antique Persian Tabriz Rugs" for a category-leading chain. Only ever non-empty
-     * on an actual chain page (2+ segments in whichever of self::$category_chain_terms /
-     * self::$chain_terms is active — same precedence and same reason as
-     * chain_breadcrumb_links()) — a plain single-attribute or bare-category page has both arrays
-     * empty and is left to bare_archive_title_text() instead. Deliberately uses each entry's
-     * plain term ->name (not a category's curated `seo_title` meta override) even for the
-     * leading category segment, since that override is meant to replace a bare category page's
-     * whole H1, not to be a prefix glued onto a generated attribute list.
+     * Fixed grammatical display order for chain H1/title text — Category, Design, Shape, Color,
+     * Origin, Material, then whatever's left (Feel, Thickness — not covered by any real keyword
+     * research, kept last in their existing self::CHAIN_DIMENSION_ORDER relative order since
+     * nothing specifies otherwise), then the trailing "Rugs". This is deliberately NOT the same
+     * as self::CHAIN_DIMENSION_ORDER (which governs the canonical *URL* segment order and 301
+     * redirects) — the URL order is arbitrary/alphabetical-ish, while this one follows standard
+     * English adjective ordering (style/opinion, then shape, then colour, then origin, then
+     * material, right before the noun) so the rendered text reads as natural English regardless
+     * of which order the segments appear in the URL. Any dimension missing from the active chain
+     * is simply skipped — see chain_title_text().
+     */
+    const CHAIN_DISPLAY_ORDER = ['product-category', 'design', 'shape', 'color', 'origin', 'material', 'feel', 'thickness'];
+
+    /**
+     * H1/title text for a chain: term names in self::CHAIN_DISPLAY_ORDER (not URL order — see
+     * that constant's own comment) + " Rugs", e.g. "Red Tabriz Rugs" for /origin/tabriz/color/red/
+     * (Color before Origin), "Modern Kerman Rugs" for /origin/kerman/design/modern/ (Design before
+     * Origin), or "Antique Persian Tabriz Rugs" for a category-leading chain (Category's own name
+     * already precedes everything). Only ever non-empty on an actual chain page (2+ segments in
+     * whichever of self::$category_chain_terms / self::$chain_terms is active — same precedence
+     * and same reason as chain_breadcrumb_links()) — a plain single-attribute or bare-category
+     * page has both arrays empty and is left to bare_archive_title_text() instead. Deliberately
+     * uses each entry's plain term ->name (not a category's curated `seo_title` meta override)
+     * even for the leading category segment, since that override is meant to replace a bare
+     * category page's whole H1, not to be a prefix glued onto a generated attribute list.
      *
      * No "Persian" and no "Handmade" here, by design — unlike bare_archive_title_text()'s single-
      * term formulas (pa_color/pa_shape/pa_size add "Persian", pa_design has per-term overrides,
      * every bare pa_* page gets "Handmade Rugs"), a chain already combines multiple identity-
-     * carrying terms (an origin name, a category name, etc.) in URL order — the architecture
-     * decision is that combination alone is the H1's identity, with a single trailing "Rugs" and
-     * nothing else injected. (An earlier version of this function did append the same "Handmade
-     * Rugs" suffix as the single-term pages — e.g. "Tabriz Red Handmade Rugs" — which was wrong
-     * for chains specifically; fixed here.)
+     * carrying terms (an origin name, a category name, etc.) — the architecture decision is that
+     * combination alone is the H1's identity, with a single trailing "Rugs" and nothing else
+     * injected. (An earlier version of this function did append the same "Handmade Rugs" suffix
+     * as the single-term pages — e.g. "Tabriz Red Handmade Rugs" — which was wrong for chains
+     * specifically; fixed here.) The one exception: if the chain includes a pa_origin term whose
+     * own name already contains "Persia" (the 4 "{Direction} Persia" terms — Northeastern,
+     * Northwestern, Southern, Western), a category segment's contribution has "Persian" stripped
+     * out of it first, so a chain like Vintage Persian Rugs + Western Persia doesn't repeat the
+     * concept twice ("Vintage Persian Western Persia Rugs") — only "Vintage Western Persia Rugs".
+     * This only fires when actively chained with one of those 4 origin terms; the category's own
+     * bare (non-chained) page keeps "Persian" as-is via bare_archive_title_text().
      *
      * Strips a trailing "Rug"/"Rugs" from every individual segment's name (not just the final
      * joined string) before joining — since every style category was renamed to end in "Rugs"
@@ -1845,9 +1867,30 @@ class Shop
         } else {
             return '';
         }
-        $names = array_map(function ($entry) {
-            return preg_replace('/\s+rugs?$/i', '', $entry['term']->name);
+
+        $display_order = array_flip(self::CHAIN_DISPLAY_ORDER);
+        usort($chain, function ($a, $b) use ($display_order) {
+            $a_pos = $display_order[$a['base']] ?? PHP_INT_MAX;
+            $b_pos = $display_order[$b['base']] ?? PHP_INT_MAX;
+            return $a_pos <=> $b_pos;
+        });
+
+        $has_persia_origin = false;
+        foreach ($chain as $entry) {
+            if ($entry['taxonomy'] === 'pa_origin' && stripos($entry['term']->name, 'persia') !== false) {
+                $has_persia_origin = true;
+                break;
+            }
+        }
+
+        $names = array_map(function ($entry) use ($has_persia_origin) {
+            $name = preg_replace('/\s+rugs?$/i', '', $entry['term']->name);
+            if ($has_persia_origin && $entry['taxonomy'] === 'product_cat') {
+                $name = trim(preg_replace('/\bpersian\b\s*/i', '', $name));
+            }
+            return $name;
         }, $chain);
+
         $combined = implode(' ', $names);
         if (preg_match('/\s+rugs?$/i', $combined)) {
             return $combined;
