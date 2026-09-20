@@ -1124,3 +1124,27 @@ Deployed via SFTP (paramiko): `templates/header/header-shop.php`. Committed to g
 - Server's `debug.log` size unchanged post-deploy (387,084,368 bytes) — zero new entries. `php -l` clean on `header-shop.php`.
 
 Deployed via SFTP (paramiko): `templates/header/header-shop.php`. Committed to git alongside this log entry, pushed to `origin/main`.
+
+---
+
+## 51. Added a per-category chip-suggestion-dimension override — all 6 categories now suggest, Modern/Patina now suggest Color (not "no chip")
+
+**Premise check first, before writing anything:** the task described a "per-category chip-dimension config" as already deployed with wrong values. Grepped `Shop.php` for any per-category chip logic (`modern`, `patina`, `CATEGORY_CHIP`, etc.) — **none existed anywhere**. `get_next_filter_suggestion()` has only ever used one global `self::NEXT_FILTER_PRIORITY = ['origin', 'color', 'shape']` for every bare category page, so every one of the 6 style categories — Antique, Vintage, Kilim, Heritage, Modern, Patina alike — always suggested "Origin" first, with no per-category distinction at all. Confirmed live before touching anything: `/product-category/modern-persian-rugs/` did show "Narrow by Origin", matching the task's own reported symptom, but the cause wasn't a misconfigured or slug-mismatched config (no config existed to mismatch) — it's that this feature had to be built from scratch. Also confirmed no prior "no chip for Modern/Patina" code existed either (grepped `get_next_filter_suggestion()`/`get_active_path_bases()` for any `modern`/`patina` special-case) — so there was nothing to remove for that part of the correction, only the new override to add.
+
+**Change (`Shop.php`):** added `const CATEGORY_CHIP_DIMENSION` — a slug → dimension map for the 6 post-rename category slugs (`antique-persian-rugs`/`vintage-persian-rugs` → `origin`; `persian-kilim-rugs`/`heritage-rugs`/`modern-persian-rugs`/`patina-rugs` → `color`). In `get_next_filter_suggestion()`, before computing `$active_in_sequence`, the function now looks for a `product-category` entry in `$active` and, if its slug has an override, moves that dimension to the front of a per-call `$priority` list (otherwise identical to `self::NEXT_FILTER_PRIORITY`); every subsequent reference to the priority list inside the function (both the depth-cap count and the 0/2-active `$remaining` diff) now reads this `$priority` variable instead of the constant directly. This only ever changes the 0-active branch's answer for a listed category — the 2-active branch's diff always leaves exactly one dimension regardless of list order, so nothing else about the function's behavior changes, and the existing min-2-candidates recursion (`count($candidates) < 2` → recurse with the dimension added to `$skip_bases`) and the 3-dimension depth cap both keep working unmodified, just walking this reordered-per-category list instead of the fixed global one. The AJAX "Skip" handler needed no changes — it already reconstructs `$active` with the same `base`/`slug` shape from the client, so it picks up the override for free.
+
+**Verified live via `curl` + Playwright, all 6 categories:**
+- `/product-category/antique-persian-rugs/` → **Narrow by Origin** (5 chips: Bakhtiari, Lilihan, Malayer, Senneh, Turkman).
+- `/product-category/vintage-persian-rugs/` → **Narrow by Origin** (11 chips, capped at `NEXT_FILTER_CHIP_CAP`).
+- `/product-category/persian-kilim-rugs/` → **Narrow by Color** (2 chips — smallest category, still ≥2 per the existing min-candidates rule).
+- `/product-category/heritage-rugs/` → **Narrow by Color** (10 chips).
+- `/product-category/modern-persian-rugs/` → **Narrow by Color** (11 chips: Beige, Pink, Brown, Grey, Red, White, Olive, Blue, Orange, Black, Green) — not Origin, not empty, matching the task's explicit correction.
+- `/product-category/patina-rugs/` → **Narrow by Color** (6 chips) — not empty.
+- Chip link resolution: clicked through Modern's Beige chip → `/product-category/modern-persian-rugs/color/beige/` → `200`, 96 results, H1 "Modern Persian Beige Rugs", and the *next* suggestion on that page correctly falls to `Narrow by Shape` (the existing single-active `SINGLE_ACTIVE_PAIRING` rule, `color → shape`, unaffected by the category override — that override only ever applies to the 0-active bare-category case).
+- Min-2-candidates/depth-cap sanity: chip counts across all 6 ranged 2–11, never a lone 1-chip row, never over the 12-chip cap.
+- Playwright screenshots (1440px) of all 6 — zero console errors on every page.
+- Server's `debug.log` size unchanged post-deploy (387,084,368 bytes) — zero new entries. `php -l` clean on `Shop.php`.
+
+**Correcting the record:** all 6 style categories get a chip row — none are chip-less. Modern and Patina now suggest Color, not "no chip" — that earlier-session exclusion, referenced in the task, never actually existed in this codebase's history (checked git blame/PROGRESS-LOG both — no such change was ever made), so nothing was reverted, just this new override added. This is a deliberate, explicit choice for site-wide UX consistency, made knowing the underlying Modern/Patina + Color combination pages likely carry lower or mixed SEO value than an Origin-based combination would.
+
+Deployed via SFTP (paramiko): `App/Controller/Shop.php`. Committed to git alongside this log entry, pushed to `origin/main`.

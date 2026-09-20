@@ -910,6 +910,34 @@ class Shop
     /** Cap on how many candidate-term chips are rendered for the suggested dimension. */
     const NEXT_FILTER_CHIP_CAP = 12;
 
+    /**
+     * Per-category override for which dimension the chip row suggests first, on a bare category
+     * page (0 attribute dimensions active — the category is the only active path segment).
+     * Without this, every category fell through to self::NEXT_FILTER_PRIORITY's plain list order
+     * and always suggested "origin" first, regardless of category — confirmed live as a real bug
+     * (`/product-category/modern-persian-rugs/` showing "Narrow by Origin" instead of the intended
+     * Color) before this was added; no per-category config existed anywhere in this codebase
+     * previously, despite an earlier task description assuming one did.
+     *
+     * Keyed by the live, post-rename `product_cat` slug (see §40/§48's renames — antique/colorful-
+     * vintage/kilim-rug/modern/heritage-rug/patina all became these 6). Deliberate, explicit
+     * decision for site-wide UX consistency: every one of these 6 categories gets a chip row (none
+     * chip-less), with Modern and Patina suggesting Color rather than the "no chip for Modern"
+     * exclusion an earlier session had concluded — that exclusion never actually existed in code
+     * either (grepped: no `modern`/`patina` special-case anywhere in this function before this
+     * change), so there was nothing to remove, just this override to add. A category not listed
+     * here, or any non-bare-category page (single attribute, chain), is unaffected and keeps using
+     * self::NEXT_FILTER_PRIORITY's plain order exactly as before.
+     */
+    const CATEGORY_CHIP_DIMENSION = [
+        'antique-persian-rugs' => 'origin',
+        'vintage-persian-rugs' => 'origin',
+        'persian-kilim-rugs'   => 'color',
+        'heritage-rugs'        => 'color',
+        'modern-persian-rugs'  => 'color',
+        'patina-rugs'          => 'color',
+    ];
+
     public static function attribute_taxonomies()
     {
         return array_values(self::$tax_map);
@@ -1025,13 +1053,19 @@ class Shop
      * separate request with no page context of its own, same reason ajax_load_more_products()
      * needs archive_pa_filters instead of relying on self::$chain_terms): which dimension to
      * suggest depends on how many of origin/color/shape are currently active — 0 (a bare category
-     * page) or 2 (missing exactly one) both use self::NEXT_FILTER_PRIORITY's list order directly;
+     * page) or 2 (missing exactly one) both use the effective priority list's order directly;
      * exactly 1 (a single-attribute page) uses self::SINGLE_ACTIVE_PAIRING's fixed pairwise rule
      * instead (see both constants' own docs for why). Either way, $skip_bases removes a dimension
      * from consideration too, for the "Skip" UI. Its candidate terms are each counted against
      * $active + that term (reusing build_filter_query_args()'s tax_query for the $_GET-driven
      * part, same single source of truth as everywhere else), zero-result terms excluded, capped
      * at self::NEXT_FILTER_CHIP_CAP terms with the most products first.
+     *
+     * "Effective priority list" = self::NEXT_FILTER_PRIORITY, unless $active's category segment
+     * (if any) has a self::CATEGORY_CHIP_DIMENSION override, in which case that dimension is moved
+     * to the front — this only ever changes the 0-active branch's answer (the 2-active branch's
+     * diff always leaves exactly one dimension regardless of order) and only for a listed category,
+     * so every other page shape is unaffected.
      *
      * Returns null when $active is empty (product_cat, shop, etc. should pass []), when all 3 of
      * origin/color/shape are already active (the existing depth cap), when the 1-active case's
@@ -1040,7 +1074,9 @@ class Shop
      * either branch — when a dimension turns out to have fewer than 2 viable candidates against
      * the current chain (zero is a dead end same as before; exactly 1 is now treated the same way,
      * since a lone chip with no alternative gives the visitor no real choice and isn't useful
-     * navigation).
+     * navigation). The recursive fallback in that last case still walks the rest of the effective
+     * priority list, so a listed category whose overridden dimension turns out to have fewer than
+     * 2 candidates still falls back sensibly rather than rendering nothing.
      */
     public static function get_next_filter_suggestion($active, $skip_bases = [])
     {
@@ -1048,8 +1084,17 @@ class Shop
             return null;
         }
 
+        $priority = self::NEXT_FILTER_PRIORITY;
+        foreach ($active as $entry) {
+            if ($entry['base'] === 'product-category' && isset(self::CATEGORY_CHIP_DIMENSION[$entry['slug']])) {
+                $override = self::CATEGORY_CHIP_DIMENSION[$entry['slug']];
+                $priority = array_values(array_unique(array_merge([$override], $priority)));
+                break;
+            }
+        }
+
         $active_bases = array_column($active, 'base');
-        $active_in_sequence = array_values(array_intersect(self::NEXT_FILTER_PRIORITY, $active_bases));
+        $active_in_sequence = array_values(array_intersect($priority, $active_bases));
 
         // All 3 already active — the existing depth cap, unchanged.
         if (count($active_in_sequence) >= 3) {
@@ -1068,10 +1113,11 @@ class Shop
             }
         } else {
             // 0 active (bare category page) or 2 active (missing exactly one): list order already
-            // gives the right answer either way — diffing the full 3-item list against zero
-            // actives starts at origin, and against two actives always leaves exactly the one
+            // gives the right answer either way — diffing the full 3-item effective priority list
+            // against zero actives starts at its first entry (origin, or a category's override —
+            // see $priority above), and against two actives always leaves exactly the one
             // dimension that's missing, regardless of which two those are.
-            $remaining = array_values(array_diff(self::NEXT_FILTER_PRIORITY, $active_bases, $skip_bases));
+            $remaining = array_values(array_diff($priority, $active_bases, $skip_bases));
             if (empty($remaining)) {
                 return null;
             }
