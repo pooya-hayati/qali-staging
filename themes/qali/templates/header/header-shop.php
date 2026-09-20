@@ -49,6 +49,10 @@ $attribute_description = ($attribute_term instanceof WP_Term)
 // with attributes, e.g. /product-category/colorful-vintage/origin/tabriz/). get_active_path_bases()
 // itself is the single source of truth for "is this a page the chip row belongs on" — it already
 // returns [] for every other page type (shop, blog, etc.), so no separate gate is needed here.
+// Also gated on $show_filter_panel below at render time — this row and the Filter button/modal now
+// share the same under-5-products visibility rule (corrected from an earlier session's assumption
+// that they were independent; confirmed live that the chip row kept showing on a 4-product page
+// after the Filter button was already hidden there).
 $next_filter_active = \App\Controller\Shop::get_active_path_bases();
 $next_filter_suggestion = !empty($next_filter_active)
 	? \App\Controller\Shop::get_next_filter_suggestion($next_filter_active)
@@ -79,11 +83,12 @@ $clear_all_url = $any_filter_active ? get_post_type_archive_link('product') : ''
 $modal_filter_count = \App\Controller\Shop::active_modal_filter_count();
 
 // Below a 5-product result, the Price/Size/Color/Design/Origin filter panel (the "Filter" button +
-// its modal) is hidden entirely — there's nothing meaningful left to narrow down. Breadcrumb and
-// "Clear all" stay put regardless (see the template below — neither is inside this gate), as the
-// navigation fallback back to a broader view. Deliberately doesn't touch the result count, active-
-// filter pills, or the standalone Sort control, none of which the task named — only the named
-// "filter panel" (the Filter button + #filter-modal) is gated on this.
+// its modal) AND the "Narrow by [dimension]" chip suggestion row above it (rendered further down,
+// gated on this same variable — see $next_filter_suggestion's render-time `if`) are both hidden
+// entirely — there's nothing meaningful left to narrow down either way. Breadcrumb and "Clear all"
+// stay put regardless (see the template below — neither is inside this gate), as the navigation
+// fallback back to a broader view. Deliberately doesn't touch the result count, active-filter
+// pills, or the standalone Sort control, none of which the task named.
 $show_filter_panel = $result_count >= 5;
 
 /**
@@ -153,7 +158,7 @@ $filter_ok_icon_svg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="non
 								<div class="page-header-category-description"><?= wp_kses_post($attribute_description) ?></div>
 							<?php endif; ?>
 						<?php endif; ?>
-						<?php if ($next_filter_suggestion) : ?>
+						<?php if ($next_filter_suggestion && $show_filter_panel) : ?>
 							<?php get_template_part_var('templates/shop/next-filter-chips.php', ['suggestion' => $next_filter_suggestion, 'skipped' => [], 'active' => $next_filter_active]) ?>
 						<?php endif; ?>
 					</div>

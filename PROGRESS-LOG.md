@@ -1102,9 +1102,25 @@ Deployed: nothing to SFTP for this task (no `Shop.php`/theme file changed — th
 - `/origin/tabriz/color/red/` (18 Results) → Filter button + `#filter-modal` present, unchanged.
 - `/origin/kerman/design/modern/` (2 Results) → Filter button and `#filter-modal` both absent from the HTML entirely; breadcrumb (`Home » Kerman » Modern`) and "Clear all" (linking to `/products/`, same reset behavior as always) both present and unchanged; `.page-header-filter-controls` cleanly contains just the Sort dropdown with no orphan markup.
 - `/product-category/vintage-persian-rugs/origin/western-persia/` (1 Result) → same: filter panel absent, breadcrumb/Clear all intact.
-- Chip suggestion row (`next-filter-suggestion` / "Narrow by …") confirmed independent: absent on both tested low-count chain pages (already 2-way chains past the suggestion depth cap — unrelated to this change, same as any other 2-way chain), but confirmed still rendering normally on a high-count bare page (`/origin/tabriz/`, 210 Results, "Narrow by Shape" chip row present) — `get_active_path_bases()`/`get_next_filter_suggestion()` were never touched.
+- Chip suggestion row (`next-filter-suggestion` / "Narrow by …") confirmed independent: absent on both tested low-count chain pages (already 2-way chains past the suggestion depth cap — unrelated to this change, same as any other 2-way chain), but confirmed still rendering normally on a high-count bare page (`/origin/tabriz/`, 210 Results, "Narrow by Shape" chip row present) — `get_active_path_bases()`/`get_next_filter_suggestion()` were never touched. **Correction (§50): this "independent" conclusion was wrong** — both low-count test pages here happened to be 2-way chains with no suggestion to show regardless of count, which masked the real case (a low-count page that *would* have a suggestion, e.g. a bare category with few products) where the chip row kept rendering. See §50, which now hides both components on the same threshold.
 - Show More/pagination: `data-max-pages="1"` on the 2-result page (no Show More button rendered, correctly) — `product-grid.php`'s pagination logic reads the query directly and was untouched by this change.
 - Playwright screenshots at 1440px and 390px on one high-count and one low-count page each — zero console errors on all four; at 390px the low-count page's filter bar reflows to a single full-width Sort row with no gap or broken spacing where the Filter button used to sit.
 - `php -l` clean on `header-shop.php`. Server's `debug.log` size unchanged post-deploy (387,084,368 bytes) — zero new entries.
+
+Deployed via SFTP (paramiko): `templates/header/header-shop.php`. Committed to git alongside this log entry, pushed to `origin/main`.
+
+---
+
+## 50. Corrected §49: the "Narrow by [dimension]" chip row now shares the same under-5 threshold as the Filter button/modal
+
+§49 hid the Filter button/modal below 5 results but left the chip suggestion row alone, on the reasoning that `get_active_path_bases()`/`get_next_filter_suggestion()` were a fully separate feature — confirmed live at the time on two low-count *chain* pages, but both happened to be 2-way chains already past the suggestion depth cap, so neither had a suggestion to show regardless of count. That masked the real case: a low-count *bare-category* page still gets a suggestion (e.g. `/product-category/vintage-persian-rugs/origin/josheqan/`, 4 results, still showed "Narrow by …" before this fix) — confirmed live by the user before this task started. **The two components are not independent; they now share one threshold.**
+
+**Change (`header-shop.php`):** the chip row's render-time condition, `<?php if ($next_filter_suggestion) : ?>`, now reads `<?php if ($next_filter_suggestion && $show_filter_panel) : ?>` — `$show_filter_panel` (`$result_count >= 5`, added in §49) is computed earlier in the same top-of-file PHP block, so no reordering was needed. Updated both `$show_filter_panel`'s own comment and the `$next_filter_suggestion` block's comment to describe the corrected, shared-threshold rule instead of the wrong "independent" one from §49.
+
+**Verified live via `curl` + Playwright:**
+- `/product-category/vintage-persian-rugs/origin/josheqan/` (4 Results) → both `next-filter-suggestion` and `filter-modal-toggle`/`#filter-modal` now absent. Breadcrumb (`Home » Vintage Persian Rugs » Josheqan`) and "Clear all" (→ `/products/`, confirmed clickable via Playwright) both present and functional.
+- `/product-category/vintage-persian-rugs/` (101 Results) → both render normally: "Narrow by Origin" chip row with 9 origin chips, and the "FILTER" button with its modal. (No "Clear all" here, correctly — no filter is active on this bare category page, same pre-existing rule as always.)
+- Playwright screenshots at 1440px (both pages) and 390px (low-count page) — zero console errors across all three.
+- Server's `debug.log` size unchanged post-deploy (387,084,368 bytes) — zero new entries. `php -l` clean on `header-shop.php`.
 
 Deployed via SFTP (paramiko): `templates/header/header-shop.php`. Committed to git alongside this log entry, pushed to `origin/main`.
