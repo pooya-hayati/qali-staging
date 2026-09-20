@@ -84,6 +84,7 @@ class Shop
         add_filter('wpseo_breadcrumb_links', [$this, 'chain_breadcrumb_links']);
         add_filter('wpseo_canonical', [$this, 'chain_canonical']);
         add_filter('wpseo_robots_array', [$this, 'chain_robots']);
+        add_filter('wpseo_metadesc', [$this, 'archive_meta_description_fallback']);
 
         // Category + attribute chained URLs (/product-category/colorful-vintage/origin/tabriz/…) —
         // separate rewrite rule/query vars from the attribute-only chain above so the two parsers
@@ -2292,6 +2293,54 @@ class Shop
             $robots['follow'] = 'follow';
         }
         return $robots;
+    }
+
+    /**
+     * Fallback for Yoast's `wpseo_metadesc` filter on a bare (non-chained) product_cat or single
+     * pa_* attribute archive: when Yoast's own generated meta description is empty (no per-term
+     * override and no taxonomy-wide template configured in Search Appearance — confirmed via
+     * reading `IndexableTermArchivePresentation::generate_meta_description()`, which only ever
+     * checks those two sources, unlike its own `generate_open_graph_description()` a few lines
+     * below it, which explicitly falls back to the term's native `term_description()` when both
+     * of those are empty too), this does the same fallback for the meta description tag — so
+     * `<meta name="description">` and `<meta property="og:description">` show the same real
+     * content instead of one being populated and the other silently blank. Investigated as part
+     * of the same task that found this: `<meta name="description">` was missing site-wide not
+     * because of any bug, but because no content or template was ever entered anywhere Yoast's
+     * own (unmodified) meta-description generator looks — a genuine content/config gap, safe and
+     * narrow to backfill here since it only ever fires when Yoast itself has nothing to offer.
+     *
+     * Deliberately scoped to bare single-term pages only (`$chain_title === ''`, mirroring
+     * header-shop.php's own $attribute_description/$category_seo_description on-page gating) —
+     * a chain page combines multiple dimensions with no single term's description obviously
+     * representing the combination, same reasoning chain_title_text() already uses to not reuse
+     * a bare page's own formula, so chains are left exactly as Yoast generates them (empty, same
+     * as before this change).
+     */
+    public function archive_meta_description_fallback($metadesc)
+    {
+        if ($metadesc !== '') {
+            return $metadesc;
+        }
+
+        if (self::chain_title_text() !== '') {
+            return $metadesc;
+        }
+
+        $term = null;
+        if (is_tax('product_cat') || is_tax(self::attribute_taxonomies())) {
+            $term = get_queried_object();
+        }
+        if (!($term instanceof WP_Term)) {
+            return $metadesc;
+        }
+
+        $description = term_description($term->term_id, $term->taxonomy);
+        if ($description === '') {
+            return $metadesc;
+        }
+
+        return wp_strip_all_tags($description);
     }
 
     public static function handle_query($query)
