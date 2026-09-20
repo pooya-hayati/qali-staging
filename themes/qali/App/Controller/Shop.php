@@ -2165,14 +2165,106 @@ class Shop
     }
 
     /**
-     * Explicit canonical for a chain page. self::$chain_terms is always already in
+     * Real product IDs matching an AND of every entry's taxonomy+slug (1 entry = a single-
+     * dimension page, 2+ = a chain) — same direct, non-main `WP_Query(['post_type' => 'product',
+     * 'fields' => 'ids', ...])` pattern self::get_next_filter_suggestion() already uses for this
+     * exact kind of ad-hoc product-set lookup, not the actual page's own $wp_query (which this
+     * needs to call for *other*, non-rendered candidate URLs too, not just the current page).
+     * Sorted so two calls' results can be compared with a plain `===` for exact-set equality —
+     * same IDs, same count, not just the same count.
+     */
+    private static function product_ids_for_chain(array $entries)
+    {
+        $tax_query = [];
+        foreach ($entries as $entry) {
+            $tax_query[] = ['taxonomy' => $entry['taxonomy'], 'field' => 'slug', 'terms' => [$entry['slug']]];
+        }
+        if (count($tax_query) > 1) {
+            $tax_query['relation'] = 'AND';
+        }
+        $q = new WP_Query([
+            'post_type'      => 'product',
+            'posts_per_page' => -1,
+            'fields'         => 'ids',
+            'no_found_rows'  => true,
+            'tax_query'      => $tax_query,
+        ]);
+        $ids = $q->posts;
+        sort($ids);
+        return $ids;
+    }
+
+    /**
+     * Duplicate-content canonical override for an exactly-2-dimension chain (category+attribute,
+     * e.g. /product-category/heritage-rugs/origin/sultanabad/, or attribute+attribute, e.g.
+     * /origin/tabriz/color/red/) whose product ID set is 100% identical — not just same count, the
+     * literal same set of IDs — to one of the two single-dimension pages it would collapse to by
+     * dropping the other dimension. Real, live product sets compared via self::product_ids_for_chain()
+     * (a direct tax_query lookup), never a hardcoded term-pair list, per explicit task direction —
+     * this is what makes it dynamic/reusable: it keeps working as products are added/removed, and
+     * applies to any origin/category/color combination that happens to hit 100% overlap now or in
+     * the future, not just the Sultanabad case that surfaced the need for it.
+     *
+     * Checks both "keep only the first entry" and "keep only the second entry" as the candidate
+     * broader page — either side of a 2-way chain can turn out to be the one that adds zero real
+     * restriction over the other — and returns the first exact match found. Returns null (no
+     * override; self-referential/default canonical stands) for every other case: a single-
+     * dimension page (nothing to collapse to), a 3+-dimension chain (explicitly out of scope per
+     * the task — full identity across 3 dimensions is unlikely and not worth the complexity here),
+     * an empty product set (nothing meaningful to dedupe), or a real 2-dimension combination where
+     * neither single-dimension candidate is an exact match (a genuine partial-overlap page, which
+     * must NOT get canonicalized away — checked live against a real non-matching pair before
+     * shipping this, see PROGRESS-LOG.md).
+     *
+     * Deliberately independent of self::CHAIN_NOINDEX_MIN_PRODUCTS/chain_robots() below: a page
+     * can be both canonicalized-away here AND noindexed there if it's also thin — no conflict,
+     * since a noindexed page still declares whichever canonical is correct for it, and a page
+     * that's canonicalized away here still gets whatever robots value chain_robots() computes for
+     * it independently, based on its own real product count.
+     */
+    private static function duplicate_content_canonical()
+    {
+        if (count(self::$category_chain_terms) === 2) {
+            $chain = array_values(self::$category_chain_terms);
+        } elseif (count(self::$chain_terms) === 2) {
+            $chain = array_values(self::$chain_terms);
+        } else {
+            return null;
+        }
+
+        $narrow_ids = self::product_ids_for_chain($chain);
+        if (empty($narrow_ids)) {
+            return null;
+        }
+
+        foreach ($chain as $broad_entry) {
+            $broad_ids = self::product_ids_for_chain([$broad_entry]);
+            if ($broad_ids === $narrow_ids) {
+                return home_url(self::chain_path([$broad_entry]));
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Explicit canonical for a chain page. self::duplicate_content_canonical() is checked first —
+     * see its own doc — and, if it finds a 100%-identical broader single-dimension page, its URL
+     * wins over everything below. Otherwise: self::$chain_terms is always already in
      * self::CHAIN_DIMENSION_ORDER by the time this runs — any out-of-order request 301-redirects
      * in parse_attribute_chain() before a page ever renders — so this is just the current URL,
      * stated explicitly rather than left to Yoast's own default (which chain_path() built anyway,
-     * this keeps a single source of truth for how a chain's canonical URL is spelled).
+     * this keeps a single source of truth for how a chain's canonical URL is spelled). A category-
+     * leading chain (self::$category_chain_terms) that isn't a duplicate-content match falls
+     * through to Yoast's own default self-referential canonical, same as before this task.
      */
     public function chain_canonical($canonical)
     {
+        $duplicate_canonical = self::duplicate_content_canonical();
+        if ($duplicate_canonical !== null) {
+            return $duplicate_canonical;
+        }
+
         if (count(self::$chain_terms) < 2) {
             return $canonical;
         }
