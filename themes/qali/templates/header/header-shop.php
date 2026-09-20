@@ -78,6 +78,14 @@ $clear_all_url = $any_filter_active ? get_post_type_archive_link('product') : ''
 // Filter-modal badge — Price/Size/Color/Design/Origin only, see Shop::active_modal_filter_count().
 $modal_filter_count = \App\Controller\Shop::active_modal_filter_count();
 
+// Below a 5-product result, the Price/Size/Color/Design/Origin filter panel (the "Filter" button +
+// its modal) is hidden entirely — there's nothing meaningful left to narrow down. Breadcrumb and
+// "Clear all" stay put regardless (see the template below — neither is inside this gate), as the
+// navigation fallback back to a broader view. Deliberately doesn't touch the result count, active-
+// filter pills, or the standalone Sort control, none of which the task named — only the named
+// "filter panel" (the Filter button + #filter-modal) is gated on this.
+$show_filter_panel = $result_count >= 5;
+
 /**
  * List→submenu filter modal (this session): the main screen shows one row per dimension with
  * its currently-selected term's name (or "All") on the right — computed here at page-load time
@@ -193,15 +201,18 @@ $filter_ok_icon_svg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="non
 										</label>
 									</div>
 								</div>
-								<button type="button" class="filter-modal-toggle button button-outline-primary">
-									<?= __('Filter', LANG_STRING) ?>
-									<?php if ($modal_filter_count > 0) : ?>
-										<span class="filter-modal-badge"><?= (int) $modal_filter_count ?></span>
-									<?php endif; ?>
-								</button>
+								<?php if ($show_filter_panel) : ?>
+									<button type="button" class="filter-modal-toggle button button-outline-primary">
+										<?= __('Filter', LANG_STRING) ?>
+										<?php if ($modal_filter_count > 0) : ?>
+											<span class="filter-modal-badge"><?= (int) $modal_filter_count ?></span>
+										<?php endif; ?>
+									</button>
+								<?php endif; ?>
 							</div>
 						</div>
 
+						<?php if ($show_filter_panel) : ?>
 						<div id="filter-modal" class="filter-modal">
 							<div class="filter-modal-dialog">
 
@@ -401,6 +412,7 @@ $filter_ok_icon_svg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="non
 
 							</div>
 						</div>
+						<?php endif; ?>
 					</form>
 				</div>
 			</div>

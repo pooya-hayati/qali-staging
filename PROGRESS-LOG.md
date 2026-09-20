@@ -1088,3 +1088,23 @@ Script echoed a JSON confirmation of every step (before/after term name+slug, `s
 - Server's `debug.log` size unchanged post-change (387,084,368 bytes, same as §45's last recorded check) — zero new entries.
 
 Deployed: nothing to SFTP for this task (no `Shop.php`/theme file changed — the rename lives entirely in the DB). Committed PROGRESS-LOG.md, pushed to `origin/main`.
+
+---
+
+## 49. Hid the Price/Size/Color/Design/Origin filter panel below a 5-product result count
+
+**Change (`header-shop.php`):** added `$show_filter_panel = $result_count >= 5` (right next to the existing `$result_count`/`$modal_filter_count` computations) and wrapped exactly two things in it: the `.filter-modal-toggle` "Filter" button, and the entire `#filter-modal` dialog (the Price/Size/Color/Design/Origin submenus). Nothing else in `.page-header-filter-bar` is touched — the result count text, active-filter pills, "Clear all" link, and the standalone Sort control all render unconditionally, exactly as the task specified ("Keep the breadcrumb and 'Clear all' link visible and functional regardless of count"). The breadcrumb lives in a separate `.page-header-seo` block above this one entirely, so it was never at risk either way. `$result_count` is `$wp_query->found_posts` for whatever's currently showing (already filtered by any active `$_GET`/path filters), so the threshold is evaluated against the actual visible result count on every page shape named in the task — `product_cat`, every `pa_*` single-attribute archive, and every chained/category-chained combination — with no per-page-type branching needed, since they all already flow through this one shared header template.
+
+**Why gate only the Filter button + modal, not the whole `.page-header-filter` bar:** the task named the thing to hide specifically as "the filter box (Price, Size, Color, Design, Origin filter panel)" — that's exactly `$filter_dimensions` (the 5 rows the modal renders), i.e. the Filter button and what it opens, not Sort or the result summary. Confirmed against the CSS (`.page-header-filter-bar`/`-summary`/`-controls` are all `display: flex`, no fixed widths reserved for the Filter button) that removing just that one button leaves no gap — the row reflows naturally.
+
+**Verified live via `curl` + Playwright, both before/after the boundary:**
+- `/product-category/persian-kilim-rugs/` (5 Results — exact threshold) → Filter button + `#filter-modal` present, unchanged from current behavior.
+- `/origin/tabriz/color/red/` (18 Results) → Filter button + `#filter-modal` present, unchanged.
+- `/origin/kerman/design/modern/` (2 Results) → Filter button and `#filter-modal` both absent from the HTML entirely; breadcrumb (`Home » Kerman » Modern`) and "Clear all" (linking to `/products/`, same reset behavior as always) both present and unchanged; `.page-header-filter-controls` cleanly contains just the Sort dropdown with no orphan markup.
+- `/product-category/vintage-persian-rugs/origin/western-persia/` (1 Result) → same: filter panel absent, breadcrumb/Clear all intact.
+- Chip suggestion row (`next-filter-suggestion` / "Narrow by …") confirmed independent: absent on both tested low-count chain pages (already 2-way chains past the suggestion depth cap — unrelated to this change, same as any other 2-way chain), but confirmed still rendering normally on a high-count bare page (`/origin/tabriz/`, 210 Results, "Narrow by Shape" chip row present) — `get_active_path_bases()`/`get_next_filter_suggestion()` were never touched.
+- Show More/pagination: `data-max-pages="1"` on the 2-result page (no Show More button rendered, correctly) — `product-grid.php`'s pagination logic reads the query directly and was untouched by this change.
+- Playwright screenshots at 1440px and 390px on one high-count and one low-count page each — zero console errors on all four; at 390px the low-count page's filter bar reflows to a single full-width Sort row with no gap or broken spacing where the Filter button used to sit.
+- `php -l` clean on `header-shop.php`. Server's `debug.log` size unchanged post-deploy (387,084,368 bytes) — zero new entries.
+
+Deployed via SFTP (paramiko): `templates/header/header-shop.php`. Committed to git alongside this log entry, pushed to `origin/main`.
