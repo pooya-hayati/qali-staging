@@ -2234,9 +2234,20 @@ class Shop
      */
     const CHAIN_NOINDEX_MIN_PRODUCTS = 2;
 
+    /**
+     * Bug fixed here (found by the combination-page SEO audit, PROGRESS-LOG.md §61): this used to
+     * gate on `count(self::$chain_terms) < 2` alone, which only ever reflects a PURE attribute-only
+     * chain (/origin/x/color/y/, no category) — a category-led chain
+     * (/product-category/x/origin/y/, self::$category_chain_terms) never populates $chain_terms at
+     * all, so this noindex check silently never ran for any category-led combination page,
+     * regardless of how thin it was. Confirmed live: 1- and 4-product category+origin pages both
+     * rendered index,follow before this fix. Now gates on EITHER chain source having 2+ segments,
+     * so the same self::CHAIN_NOINDEX_MIN_PRODUCTS threshold applies uniformly — category-led or
+     * not, whichever dimension happens to lead the URL.
+     */
     public function chain_robots($robots)
     {
-        if (count(self::$chain_terms) < 2) {
+        if (count(self::$chain_terms) < 2 && count(self::$category_chain_terms) < 2) {
             return $robots;
         }
         global $wp_query;
