@@ -1542,7 +1542,9 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
 }
 
 #page-header .page-header-filter {
-  margin-top: 16px;
+  /* Tight enough to read as the same filter area as the "Narrow by …" chip rows directly above
+     (their own row-to-row gap is 16px — see .page-header-chip-rows), not a separate section. */
+  margin-top: 8px;
 }
 
 .page-header-category-title {
@@ -1761,16 +1763,15 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
   display: inline-flex;
   justify-content: center;
   align-items: center;
-  padding: 4px 8px;
+  padding: 4px 14px;
   gap: 4px;
-  height: 28px;
+  height: 32px;
   background: var(--color-Neutral-50);
-  color: var(--color-Neutral-600);
+  color: var(--color-Neutral-900);
   border-radius: 40px;
   line-height: 1;
   font-weight: 400;
   font-size: 14px;
-  text-transform: capitalize;
   cursor: pointer;
 }
 
@@ -1794,7 +1795,7 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
 
 .page-header-filter-reset {
   color: var(--color-CarpetRed);
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 500;
   line-height: 1;
   background: none;
@@ -1826,14 +1827,17 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 16px;
+  /* Matches .page-header-chip-row-chips' own inner gap (10px), not the 16px row-to-row gap —
+     this is a single row's internal spacing, same category as that one. */
+  gap: 10px;
 }
 
 .page-header-filter-count {
+  /* Same font weight/size/color treatment as .page-header-chip-row-label directly above it — no
+     text-transform:uppercase (that read noticeably heavier/louder than the Narrow-by labels). */
   font-size: 14px;
   font-weight: 500;
   color: var(--color-Neutral-700);
-  text-transform: uppercase;
   white-space: nowrap;
 }
 
@@ -1851,11 +1855,20 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
 .page-header-sort {
   min-width: 180px;
   border: var(--border);
-  padding: 0 16px;
+  padding: 0 14px;
 }
 
+/* Shrunk from the 10px/24px-icon default so this dropdown's overall height sits close to the
+   FILTER button's own tightened height just below, instead of both towering over the compact
+   Narrow-by pills on the same row. */
 .page-header-sort .select-selected {
-  padding: 10px 0;
+  padding: 8px 0;
+  font-size: 14px;
+}
+
+.page-header-sort .select-selected::after {
+  width: 18px;
+  height: 18px;
 }
 
 .page-header-sort .select-items {
@@ -1863,8 +1876,20 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
   top: calc(100% + 4px);
 }
 
+.page-header-sort .select-items label {
+  font-size: 14px;
+}
+
+/* Reuses .button/.button-outline-primary's existing look (uppercase, brand-red outline/fill-on-
+   hover) — same button language as the rest of the site — just sized down from that component's
+   default 44-48px height so it doesn't dwarf the rest of this now-compact row. Scoped to this one
+   class (single use, see header-shop.php) rather than touching .button-outline-primary itself,
+   which is shared by other, unrelated buttons across the theme. */
 .filter-modal-toggle {
   position: relative;
+  height: 36px;
+  padding: 0 16px;
+  font-size: 14px;
 }
 
 .filter-modal-badge {
