@@ -66,20 +66,6 @@ while (have_posts()) {
 			<img src="<?= URL_ASSETS ?>/img/bg-intro.svg" alt="<?= SITE_NAME ?>" data-animate="fadeInDown" data-delay="500" data-duration="1000">
 		</div>
 	</section>
-	<section class="section section-intro section-full section-overlay section-covered">
-		<img src="<?= image_link($meta['intro']['image'], 'full') ?>" alt="<?= SITE_NAME ?>" class="section-bg">
-		<div class="section-wrapper">
-			<div class="container-fluid">
-				<div class="section-header">
-					<h2 class="section-title" data-animate="fadeInUp"><?= str_replace(['<p>', '</p>'], '', wpautop($meta['intro']['title'])) ?></h2>
-					<h3 class="section-subtitle" data-animate="fadeInUp" data-delay="500"><?= str_replace(['<p>', '</p>'], '', wpautop($meta['intro']['subtitle'])) ?></h3>
-					<div class="section-nav" data-animate="fadeInUp">
-						<a href="<?= get_permalink(get_page_by_path('rug-is-art')) ?>" class="section-btn button button-fill-light"><?= __('Browse it', LANG_STRING) ?></a>
-					</div>
-				</div>
-			</div>
-		</div>
-	</section>
 	<section class="section section-featured">
 		<div class="section-wrapper">
 			<div class="container-fluid">
@@ -104,12 +90,6 @@ while (have_posts()) {
 	<section class="section section-collection">
 		<div class="section-wrapper">
 			<div class="container-fluid">
-				<div class="section-header" data-animate="fadeIn">
-					<h2 class="section-title" data-animate="fadeInUp"><?= str_replace(['<p>', '</p>'], '', wpautop($meta['collection']['title'])) ?></h2>
-					<div class="section-nav" data-animate="fadeInUp">
-						<a href="<?= get_permalink(get_page_by_path('collections')) ?>" class="section-btn button button-link button-link-secondary"><?= __('See All', LANG_STRING) ?></a>
-					</div>
-				</div>
 				<div class="section-body">
 					<?php if (!empty($explore_categories)) { ?>
 						<div class="category-carousel" data-animate="fadeInUp">
@@ -118,20 +98,40 @@ while (have_posts()) {
 									<?php foreach ($explore_categories as $_category) {
 										$_thumb_id = get_term_meta($_category->term_id, 'thumbnail_id', true);
 										if (!$_thumb_id) {
+											// No curated category thumbnail set in wp-admin: prefer a product the
+											// shop has already flagged "featured" in this category (same signal
+											// the hero product picks above use) over an arbitrary first result,
+											// since plain ID/date order can surface an unrepresentative photo.
 											$_fallback_product = get_posts([
 												'post_type'      => 'product',
 												'post_status'    => 'publish',
 												'posts_per_page' => 1,
 												'fields'         => 'ids',
-												'tax_query'      => [['taxonomy' => 'product_cat', 'field' => 'term_id', 'terms' => $_category->term_id]],
+												'orderby'        => 'date',
+												'order'          => 'DESC',
+												'tax_query'      => [
+													['taxonomy' => 'product_cat', 'field' => 'term_id', 'terms' => $_category->term_id],
+													['taxonomy' => 'product_visibility', 'field' => 'name', 'terms' => 'featured'],
+												],
 											]);
+											if (empty($_fallback_product)) {
+												$_fallback_product = get_posts([
+													'post_type'      => 'product',
+													'post_status'    => 'publish',
+													'posts_per_page' => 1,
+													'fields'         => 'ids',
+													'orderby'        => 'date',
+													'order'          => 'DESC',
+													'tax_query'      => [['taxonomy' => 'product_cat', 'field' => 'term_id', 'terms' => $_category->term_id]],
+												]);
+											}
 											$_thumb_id = !empty($_fallback_product) ? get_post_thumbnail_id($_fallback_product[0]) : null;
 										}
 										$_tagline = $explore_category_taglines[$_category->slug] ?? wp_trim_words(wp_strip_all_tags($_category->description), 18, '…');
 									?>
 										<div class="swiper-slide category-carousel-slide">
 											<a href="<?= esc_url(get_term_link($_category)) ?>" title="<?= esc_attr($_category->name) ?>" class="category-card">
-												<img src="<?= image_link($_thumb_id, 'full') ?>" alt="<?= esc_attr($_category->name) ?>" class="category-card-img">
+												<img src="<?= image_link($_thumb_id, 'qali-product-card-2x') ?>" alt="<?= esc_attr($_category->name) ?>" width="520" height="692" class="category-card-img">
 												<span class="category-card-overlay">
 													<span class="category-card-name">
 														<?= esc_html($_category->name) ?>
@@ -154,6 +154,20 @@ while (have_posts()) {
 							</button>
 						</div>
 					<?php } ?>
+				</div>
+			</div>
+		</div>
+	</section>
+	<section class="section section-intro section-full section-overlay section-covered">
+		<img src="<?= image_link($meta['intro']['image'], 'full') ?>" alt="<?= SITE_NAME ?>" class="section-bg">
+		<div class="section-wrapper">
+			<div class="container-fluid">
+				<div class="section-header">
+					<h2 class="section-title" data-animate="fadeInUp"><?= str_replace(['<p>', '</p>'], '', wpautop($meta['intro']['title'])) ?></h2>
+					<h3 class="section-subtitle" data-animate="fadeInUp" data-delay="500"><?= str_replace(['<p>', '</p>'], '', wpautop($meta['intro']['subtitle'])) ?></h3>
+					<div class="section-nav" data-animate="fadeInUp">
+						<a href="<?= get_permalink(get_page_by_path('rug-is-art')) ?>" class="section-btn button button-fill-light"><?= __('Browse it', LANG_STRING) ?></a>
+					</div>
 				</div>
 			</div>
 		</div>

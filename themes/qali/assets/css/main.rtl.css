@@ -804,7 +804,7 @@ body.nav-open .user-nav > li.nav-toggle > button:nth-child(1) {
   flex-direction: column;
   gap: 6px;
   padding: 20px;
-  background: linear-gradient(to top, rgba(34, 14, 14, 0.85) 0%, rgba(34, 14, 14, 0) 65%);
+  background: linear-gradient(to top, rgba(34, 14, 14, 0.92) 0%, rgba(34, 14, 14, 0.55) 50%, rgba(34, 14, 14, 0) 100%);
   color: #fff;
 }
 .category-card-name {
@@ -814,6 +814,7 @@ body.nav-open .user-nav > li.nav-toggle > button:nth-child(1) {
   font-size: 20px;
   font-weight: 500;
   line-height: normal;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.55);
 }
 .category-card-arrow {
   width: 16px;
@@ -830,6 +831,7 @@ body.nav-open .user-nav > li.nav-toggle > button:nth-child(1) {
   line-height: 1.4;
   color: #d9d8d6;
   margin: 0;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
 }
 .category-carousel-arrow {
   position: absolute;
