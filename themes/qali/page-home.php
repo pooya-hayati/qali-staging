@@ -62,9 +62,6 @@ while (have_posts()) {
 				</div>
 			</div>
 		</div>
-		<div class="section-divider">
-			<img src="<?= URL_ASSETS ?>/img/bg-intro.svg" alt="<?= SITE_NAME ?>" data-animate="fadeInDown" data-delay="500" data-duration="1000">
-		</div>
 	</section>
 	<section class="section section-featured">
 		<div class="section-wrapper">

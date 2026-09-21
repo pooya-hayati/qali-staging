@@ -377,7 +377,7 @@ tbody.collapse.in {
   padding-top: 0;
 }
 .section-hero + .section .section-wrapper {
-  padding-top: max(120px, 16vw + 20px) !important;
+  padding-top: 100px !important;
 }
 .section-divider,
 .page-divider {

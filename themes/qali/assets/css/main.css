@@ -739,25 +739,14 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
   color: var(--color-Mushroom);
 }
 
-.section-hero .section-divider {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  transform: translateY(57.2%);
-}
-
-/* .section-hero's own divider graphic is deliberately positioned to spill over
-   (translateY 57.2%) into whichever section follows it as a decorative seam.
-   That spill is 57.2% of the divider's own height, and the divider is 100vw
-   wide at a fixed 1440:383 aspect ratio, so the overlap scales with viewport
-   width too (~15.2vw at any width) -- a flat 100px (fine for a plain
-   .section-covered section) isn't enough to clear it. Whatever section
-   follows section-hero needs this scaling clearance instead, regardless of
-   the generic ".section:not(.section-covered)+.section" zero-padding rule
-   above, so the divider never overlaps that section's own heading. */
+/* section-hero has no .section-covered class, so the generic
+   ".section:not(.section-covered)+.section" rule above would zero out the
+   top padding of whatever section follows it. That's fine for two ordinary
+   stacked sections, but section-hero is a full-viewport (.section-full)
+   section, not a normal one -- the section right after it still needs real
+   breathing room, same as a .section-covered section gets. */
 .section-hero+.section .section-wrapper {
-  padding-top: max(120px, 16vw + 20px) !important;
+  padding-top: 100px !important;
 }
 
 .section-intro {
