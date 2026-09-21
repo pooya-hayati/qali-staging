@@ -152,6 +152,32 @@ $(document).ready(function () {
 
   }
   /**/
+  if (document.body.classList.contains("page-template-page-home")) {
+    var categoryCarousel = new Swiper(".category-carousel-swiper", {
+      slidesPerView: 1.15,
+      spaceBetween: 16,
+      watchOverflow: true,
+      navigation: {
+        nextEl: ".category-carousel-next",
+        prevEl: ".category-carousel-prev",
+      },
+      breakpoints: {
+        576: {
+          slidesPerView: 2.2,
+          spaceBetween: 20,
+        },
+        992: {
+          slidesPerView: 3.2,
+          spaceBetween: 20,
+        },
+        1200: {
+          slidesPerView: 4,
+          spaceBetween: 24,
+        },
+      },
+    });
+  }
+  /**/
   function CustomSelect(selector) {
     $(selector).each(function () {
       const $customSelect = $(this);

@@ -16,6 +16,39 @@ while (have_posts()) {
 	$product = get_posts(['post_type' => 'product', 'post_status' => 'publish', 'posts_per_page' => 2, 'fields' => 'ids', 'orderby' => 'rand', 'tax_query' => [['taxonomy' => 'product_visibility', 'field' => 'name', 'terms' => 'featured']]]);
 	$blog = get_posts(['post_type' => 'post', 'post_status' => 'publish', 'posts_per_page' => 3, 'fields' => 'ids']);
 	$collector = get_posts(['post_type' => 'collector', 'post_status' => 'publish', 'posts_per_page' => -1, 'fields' => 'ids']);
+
+	// Explore Collections carousel: shown categories are pinned by slug (stable even if a
+	// category is renamed in wp-admin), but the name/link/description below are always read
+	// live via get_terms() so the section can't drift out of sync with the real taxonomy.
+	$explore_category_slugs = [
+		'antique-persian-rugs',
+		'heritage-rugs',
+		'persian-kilim-rugs',
+		'modern-persian-rugs',
+		'patina-rugs',
+		'vintage-persian-rugs',
+	];
+	$explore_category_taglines = [
+		'antique-persian-rugs' => __('Hand-knotted 80 to 100 years ago or more, each one an irreplaceable piece of living history.', LANG_STRING),
+		'heritage-rugs'        => __('Timeless craftsmanship featuring Bijar, Qashqai, Heriz, and Bakhtiari designs in luxurious wool and silk.', LANG_STRING),
+		'persian-kilim-rugs'   => __('Flat-woven kilim and wool rugs crafted for authentic, timeless style.', LANG_STRING),
+		'modern-persian-rugs'  => __('Mid-century modern rugs crafted from premium wool, redefining the classic area rug for contemporary living.', LANG_STRING),
+		'patina-rugs'          => __('Intentionally faded and gently distressed for a warm, lived-in character with lasting durability.', LANG_STRING),
+		'vintage-persian-rugs' => __('Colorful, character-rich vintage area rugs and vibrant vintage runner rugs.', LANG_STRING),
+	];
+	$explore_category_terms = get_terms(['taxonomy' => 'product_cat', 'slug' => $explore_category_slugs, 'hide_empty' => false]);
+	$explore_categories = [];
+	if (!is_wp_error($explore_category_terms)) {
+		$explore_category_terms_by_slug = [];
+		foreach ($explore_category_terms as $_term) {
+			$explore_category_terms_by_slug[$_term->slug] = $_term;
+		}
+		foreach ($explore_category_slugs as $_slug) {
+			if (isset($explore_category_terms_by_slug[$_slug])) {
+				$explore_categories[] = $explore_category_terms_by_slug[$_slug];
+			}
+		}
+	}
 ?>
 	<section class="section section-hero section-full">
 		<div class="section-wrapper">
@@ -65,46 +98,60 @@ while (have_posts()) {
 						</div>
 					<?php } ?>
 				</div>
-				<div class="section-footer">
-					<div class="row justify-content-center">
-						<div class="col-xl-11">
-							<div class="section-cover">
-								<img src="<?= URL_ASSETS ?>/img/pattern-2.svg" alt="<?= SITE_NAME ?>" data-animate="fadeInUp">
-							</div>
-						</div>
-					</div>
-				</div>
 			</div>
 		</div>
 	</section>
 	<section class="section section-collection">
 		<div class="section-wrapper">
 			<div class="container-fluid">
+				<div class="section-header" data-animate="fadeIn">
+					<h2 class="section-title" data-animate="fadeInUp"><?= str_replace(['<p>', '</p>'], '', wpautop($meta['collection']['title'])) ?></h2>
+					<div class="section-nav" data-animate="fadeInUp">
+						<a href="<?= get_permalink(get_page_by_path('collections')) ?>" class="section-btn button button-link button-link-secondary"><?= __('See All', LANG_STRING) ?></a>
+					</div>
+				</div>
 				<div class="section-body">
-					<?php if (!empty($meta['collection']['item'])) { ?>
-						<div class="collection-grid row">
-							<div class="col-md-12 col-lg-6 order-lg-1">
-								<div class="section-header" data-animate="fadeIn" data-delay="600">
-									<h2 class="section-title" data-animate="fadeInUp"><?= str_replace(['<p>', '</p>'], '', wpautop($meta['collection']['title'])) ?></h2>
-									<div class="section-nav" data-animate="fadeInUp">
-										<a href="<?= get_permalink(get_page_by_path('collections')) ?>" class="section-btn button button-link button-link-secondary"><?= __('See All', LANG_STRING) ?></a>
-									</div>
+					<?php if (!empty($explore_categories)) { ?>
+						<div class="category-carousel" data-animate="fadeInUp">
+							<div class="category-carousel-swiper swiper">
+								<div class="swiper-wrapper">
+									<?php foreach ($explore_categories as $_category) {
+										$_thumb_id = get_term_meta($_category->term_id, 'thumbnail_id', true);
+										if (!$_thumb_id) {
+											$_fallback_product = get_posts([
+												'post_type'      => 'product',
+												'post_status'    => 'publish',
+												'posts_per_page' => 1,
+												'fields'         => 'ids',
+												'tax_query'      => [['taxonomy' => 'product_cat', 'field' => 'term_id', 'terms' => $_category->term_id]],
+											]);
+											$_thumb_id = !empty($_fallback_product) ? get_post_thumbnail_id($_fallback_product[0]) : null;
+										}
+										$_tagline = $explore_category_taglines[$_category->slug] ?? wp_trim_words(wp_strip_all_tags($_category->description), 18, '…');
+									?>
+										<div class="swiper-slide category-carousel-slide">
+											<a href="<?= esc_url(get_term_link($_category)) ?>" title="<?= esc_attr($_category->name) ?>" class="category-card">
+												<img src="<?= image_link($_thumb_id, 'full') ?>" alt="<?= esc_attr($_category->name) ?>" class="category-card-img">
+												<span class="category-card-overlay">
+													<span class="category-card-name">
+														<?= esc_html($_category->name) ?>
+														<img src="<?= URL_ASSETS ?>/img/icon-arrow.svg" alt="" class="category-card-arrow">
+													</span>
+													<?php if ($_tagline !== '') { ?>
+														<span class="category-card-desc"><?= esc_html($_tagline) ?></span>
+													<?php } ?>
+												</span>
+											</a>
+										</div>
+									<?php } ?>
 								</div>
 							</div>
-							<?php foreach ($meta['collection']['item'] as $key => $_collection) { ?>
-								<div class="col-md-6 col-lg-<?= $key == 2 ? '6' : '3' ?> order-lg-<?= $key == 0 ? '0' : '2' ?>">
-									<div class="collection-card" data-animate="fadeInUp">
-										<div class="collection-card-header">
-											<img src="<?= image_link($_collection['image'], 'full') ?>" alt="<?= $_collection['title'] ?>" class="collection-card-img">
-										</div>
-										<div class="collection-card-body">
-											<h3 class="collection-card-title"><?= $_collection['title'] ?></h3>
-											<div class="collection-card-desc"><?= $_collection['description'] ?></div>
-										</div>
-										<a href="<?= get_term_link($_collection['taxonomy']) ?>" title="<?= $_collection['title'] ?>" class="overlay-link"><?= $_collection['title'] ?></a>
-									</div>
-								</div>
-							<?php } ?>
+							<button type="button" class="category-carousel-arrow category-carousel-prev" aria-label="<?= esc_attr__('Previous', LANG_STRING) ?>">
+								<img src="<?= URL_ASSETS ?>/img/icon-arrow.svg" alt="">
+							</button>
+							<button type="button" class="category-carousel-arrow category-carousel-next" aria-label="<?= esc_attr__('Next', LANG_STRING) ?>">
+								<img src="<?= URL_ASSETS ?>/img/icon-arrow.svg" alt="">
+							</button>
 						</div>
 					<?php } ?>
 				</div>
