@@ -2186,22 +2186,22 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
   }
 }
 
-/* "Suggested next filter" chips (pa_* archive pages, single-attribute or chained). Pill shape
-   and hover color reuse .page-header-filter-active .filter-tag's / .show-more-btn's own
-   established language (40px pill radius, #780000 -> #ac1f1f on hover) rather than new values. */
-.page-header-next-filter {
+/* Chip rows (pa_* archive pages, single-attribute or chained, and product_cat category pages —
+   up to 3 rows: Origin, Color, Shape). Pill shape and hover color reuse .page-header-filter-active
+   .filter-tag's / .show-more-btn's own established language (40px pill radius, #780000 ->
+   #ac1f1f on hover) rather than new values. */
+.page-header-chip-rows {
   margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
-.page-header-next-filter-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+.page-header-chip-row-header {
   margin-bottom: 12px;
 }
 
-.page-header-next-filter-label {
+.page-header-chip-row-label {
   font-size: 14px;
   font-weight: 500;
   line-height: normal;
@@ -2210,23 +2210,7 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
   text-transform: uppercase;
 }
 
-.page-header-next-filter-skip {
-  color: var(--color-CarpetRed);
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 1;
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.page-header-next-filter-skip:hover {
-  color: var(--color-Thunderbird);
-}
-
-.page-header-next-filter-chips {
+.page-header-chip-row-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
@@ -2315,6 +2299,30 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
 .next-filter-chip:hover .next-filter-chip-thumb {
   border-color: var(--color-White);
   box-shadow: 0 0 0 1px #780000;
+}
+
+/* .next-filter-chip's own `display: inline-flex` (author CSS) would otherwise override the
+   browser's default `[hidden] { display: none }` (user-agent CSS always loses to author CSS for
+   the same property, regardless of specificity) — without this, a chip past the "Show more" cap
+   would still render despite its `hidden` attribute. */
+.next-filter-chip[hidden] {
+  display: none;
+}
+
+/* "Show more" per-row control — an outline variant of the same pill so it reads as part of the
+   chip row rather than a separate action button. */
+.next-filter-chip-more {
+  background: none;
+  border: 1px solid var(--color-Neutral-200);
+  color: var(--color-CarpetRed);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.next-filter-chip-more:hover {
+  background-color: #780000;
+  border-color: #780000;
+  color: var(--color-White);
 }
 
 .range-slider {

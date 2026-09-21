@@ -60,9 +60,6 @@ class Shop
         add_action('wp_ajax_' . 'qali_load_more_products', [$this, 'ajax_load_more_products']);
         add_action('wp_ajax_' . 'nopriv_qali_load_more_products', [$this, 'ajax_load_more_products']);
 
-        add_action('wp_ajax_' . 'qali_next_filter_suggestion', [$this, 'ajax_next_filter_suggestion']);
-        add_action('wp_ajax_' . 'nopriv_qali_next_filter_suggestion', [$this, 'ajax_next_filter_suggestion']);
-
         add_filter('rwmb_meta_boxes', [$this, 'register_meta']);
         add_action('init', [$this, 'remove_product_features']);
         add_action('add_meta_boxes', [$this, 'remove_meta_boxes'], 99);
@@ -877,67 +874,27 @@ class Shop
     public static $chain_extra_tax = [];
 
     /**
-     * The 3 dimensions eligible for the "suggested next filter" chip row (see
-     * get_next_filter_suggestion()). Reduced from all 8 attribute dimensions per explicit user
-     * direction — design, material, feel, thickness, and size should never be suggested as a
-     * chip, though they remain fully functional as sidebar filters (size in particular is a
-     * normal sidebar <select>) and in manually-typed chain URLs; only this chip-suggestion list
-     * is narrowed.
-     *
-     * Used directly, in this list's order, for the 0-active case (a bare category page — diffing
-     * the full list against zero actives starts at origin) and the 2-active case (diffing always
-     * leaves exactly the one missing dimension, regardless of which two are active). The 1-active
-     * case does NOT use this list's order — see self::SINGLE_ACTIVE_PAIRING instead. A
-     * fully-chained origin+color+shape page naturally yields an empty $remaining in
-     * get_next_filter_suggestion() and renders no chip row — no separate depth-cap constant
-     * needed, the 3-element list itself is the cap.
+     * Master dimension order for the chip-row system (see get_chip_rows()). Replaces the old
+     * per-category CATEGORY_CHIP_DIMENSION override and the old single-dimension "suggested next
+     * filter" concept (NEXT_FILTER_PRIORITY / SINGLE_ACTIVE_PAIRING) entirely, retiring the earlier
+     * decision that gave Antique/Vintage an Origin-first priority and the other 4 categories a
+     * Color-first priority — re-checked against keyword data and that split wasn't justified; all 6
+     * categories now behave identically. design/material/feel/thickness/size stay excluded from
+     * this system per the same prior direction (unchanged) — they remain fully functional as
+     * sidebar filters and in manually-typed chain URLs, just never surfaced as a chip row.
      */
-    const NEXT_FILTER_PRIORITY = ['origin', 'color', 'shape'];
+    const CHIP_DIMENSION_ORDER = ['origin', 'color', 'shape'];
+
+    /** Chips shown per row before the "Show more" control reveals the rest (see get_chip_rows()). */
+    const CHIP_ROW_VISIBLE_CAP = 5;
 
     /**
-     * Fixed pairwise "what to suggest" rule for a single-attribute page — exactly one of
-     * origin/color/shape active (no category, no chain: /origin/{term}/, /color/{term}/, or
-     * /shape/{term}/ alone). Per explicit user direction, NOT "the next dimension in
-     * self::NEXT_FILTER_PRIORITY not yet active" — that would suggest origin from every one of
-     * the three single-attribute pages, including /color/{term}/ and /shape/{term}/, which isn't
-     * what's wanted here.
+     * Safety valve on how many candidate-term chips are fetched per row — not a real design cap
+     * (the row is meant to expose the "full list of values for that dimension" via "Show more"),
+     * just a guard against an unbounded number of per-term WP_Query existence checks if a taxonomy
+     * ever grows pathologically large.
      */
-    const SINGLE_ACTIVE_PAIRING = [
-        'origin' => 'color',
-        'color'  => 'shape',
-        'shape'  => 'color',
-    ];
-
-    /** Cap on how many candidate-term chips are rendered for the suggested dimension. */
-    const NEXT_FILTER_CHIP_CAP = 12;
-
-    /**
-     * Per-category override for which dimension the chip row suggests first, on a bare category
-     * page (0 attribute dimensions active — the category is the only active path segment).
-     * Without this, every category fell through to self::NEXT_FILTER_PRIORITY's plain list order
-     * and always suggested "origin" first, regardless of category — confirmed live as a real bug
-     * (`/product-category/modern-persian-rugs/` showing "Narrow by Origin" instead of the intended
-     * Color) before this was added; no per-category config existed anywhere in this codebase
-     * previously, despite an earlier task description assuming one did.
-     *
-     * Keyed by the live, post-rename `product_cat` slug (see §40/§48's renames — antique/colorful-
-     * vintage/kilim-rug/modern/heritage-rug/patina all became these 6). Deliberate, explicit
-     * decision for site-wide UX consistency: every one of these 6 categories gets a chip row (none
-     * chip-less), with Modern and Patina suggesting Color rather than the "no chip for Modern"
-     * exclusion an earlier session had concluded — that exclusion never actually existed in code
-     * either (grepped: no `modern`/`patina` special-case anywhere in this function before this
-     * change), so there was nothing to remove, just this override to add. A category not listed
-     * here, or any non-bare-category page (single attribute, chain), is unaffected and keeps using
-     * self::NEXT_FILTER_PRIORITY's plain order exactly as before.
-     */
-    const CATEGORY_CHIP_DIMENSION = [
-        'antique-persian-rugs' => 'origin',
-        'vintage-persian-rugs' => 'origin',
-        'persian-kilim-rugs'   => 'color',
-        'heritage-rugs'        => 'color',
-        'modern-persian-rugs'  => 'color',
-        'patina-rugs'          => 'color',
-    ];
+    const CHIP_ROW_FETCH_CAP = 60;
 
     public static function attribute_taxonomies()
     {
@@ -1048,93 +1005,77 @@ class Shop
     }
 
     /**
-     * Computes the "suggested next filter" chip row for a given active path-based filter chain
-     * (single or chained — pass self::get_active_path_bases() for a real page load; the "Skip"
-     * AJAX handler below reconstructs the same shape from what the client sends, since that's a
-     * separate request with no page context of its own, same reason ajax_load_more_products()
-     * needs archive_pa_filters instead of relying on self::$chain_terms): which dimension to
-     * suggest depends on how many of origin/color/shape are currently active — 0 (a bare category
-     * page) or 2 (missing exactly one) both use the effective priority list's order directly;
-     * exactly 1 (a single-attribute page) uses self::SINGLE_ACTIVE_PAIRING's fixed pairwise rule
-     * instead (see both constants' own docs for why). Either way, $skip_bases removes a dimension
-     * from consideration too, for the "Skip" UI. Its candidate terms are each counted against
-     * $active + that term (reusing build_filter_query_args()'s tax_query for the $_GET-driven
-     * part, same single source of truth as everywhere else), zero-result terms excluded, capped
-     * at self::NEXT_FILTER_CHIP_CAP terms with the most products first.
+     * Computes every chip row to show for a given active path-based filter chain (single,
+     * category, or chained — pass self::get_active_path_bases() for a real page load). Replaces
+     * the old single-suggestion get_next_filter_suggestion()/"Skip" AJAX system entirely: instead of
+     * picking one dimension to suggest at a time, this always returns every eligible dimension at
+     * once, each as its own row, so the client no longer needs an AJAX round-trip to page through
+     * dimensions — "Show more" (see chip-rows.php) is a pure client-side reveal of chips already
+     * in the markup.
      *
-     * "Effective priority list" = self::NEXT_FILTER_PRIORITY, unless $active's category segment
-     * (if any) has a self::CATEGORY_CHIP_DIMENSION override, in which case that dimension is moved
-     * to the front — this only ever changes the 0-active branch's answer (the 2-active branch's
-     * diff always leaves exactly one dimension regardless of order) and only for a listed category,
-     * so every other page shape is unaffected.
+     * Dimension order:
+     * - A category anywhere in $active (bare or chained with attributes) → self::CHIP_DIMENSION_ORDER
+     *   as-is (Origin, Color, Shape), always all 3 candidate rows, "no exceptions" per explicit
+     *   direction — this is what replaces the old per-category CATEGORY_CHIP_DIMENSION override.
+     * - No category (a bare or chained pa_* archive) → self::CHIP_DIMENSION_ORDER with $active's
+     *   own dimension(s) removed, then REVERSED. On a single-attribute page this yields the other
+     *   two in reverse master order (e.g. an Origin page → Shape, then Color) — replaces the old
+     *   SINGLE_ACTIVE_PAIRING fixed-pairwise rule. On a 2-attribute chain it yields the one
+     *   remaining dimension (reversal is a no-op on a 1-item list).
      *
-     * Returns null when $active is empty (product_cat, shop, etc. should pass []), when all 3 of
-     * origin/color/shape are already active (the existing depth cap), when the 1-active case's
-     * paired dimension has been skipped (there's no second candidate to fall back to — unlike the
-     * 0/2-active list-order case, the pairwise rule only ever has one answer), or — recursing past
-     * either branch — when a dimension turns out to have fewer than 2 viable candidates against
-     * the current chain (zero is a dead end same as before; exactly 1 is now treated the same way,
-     * since a lone chip with no alternative gives the visitor no real choice and isn't useful
-     * navigation). The recursive fallback in that last case still walks the rest of the effective
-     * priority list, so a listed category whose overridden dimension turns out to have fewer than
-     * 2 candidates still falls back sensibly rather than rendering nothing.
+     * A row for a dimension that's already active (only possible on a category page, per above) is
+     * still computed — its candidates are counted with that dimension's own active clause excluded
+     * (see build_chip_row()), so the chips offer real alternatives to switch to, not just the
+     * already-selected term. Each row is independently dropped when it has fewer than 2 viable
+     * candidates (self::build_chip_row() returns null) — the per-row equivalent of the old
+     * single-suggestion depth cap, just applied to every row instead of only one.
      */
-    public static function get_next_filter_suggestion($active, $skip_bases = [])
+    public static function get_chip_rows($active)
     {
         if (empty($active)) {
-            return null;
+            return [];
         }
 
-        $priority = self::NEXT_FILTER_PRIORITY;
+        $has_category = false;
         foreach ($active as $entry) {
-            if ($entry['base'] === 'product-category' && isset(self::CATEGORY_CHIP_DIMENSION[$entry['slug']])) {
-                $override = self::CATEGORY_CHIP_DIMENSION[$entry['slug']];
-                $priority = array_values(array_unique(array_merge([$override], $priority)));
+            if ($entry['base'] === 'product-category') {
+                $has_category = true;
                 break;
             }
         }
 
-        $active_bases = array_column($active, 'base');
-        $active_in_sequence = array_values(array_intersect($priority, $active_bases));
-
-        // All 3 already active — the existing depth cap, unchanged.
-        if (count($active_in_sequence) >= 3) {
-            return null;
-        }
-
-        if (count($active_in_sequence) === 1) {
-            // Single-attribute page: self::SINGLE_ACTIVE_PAIRING's fixed pairwise rule, not "the
-            // next dimension in list order not yet active" — see that constant's own doc. Only
-            // one candidate dimension exists per active dimension here, so skipping it leaves
-            // nothing else to offer (unlike the 0/2-active branch below, which can still fall back
-            // to whatever list-order leaves after removing a skipped dimension).
-            $next_base = self::SINGLE_ACTIVE_PAIRING[$active_in_sequence[0]];
-            if (in_array($next_base, $skip_bases, true)) {
-                return null;
-            }
+        if ($has_category) {
+            $dimensions = self::CHIP_DIMENSION_ORDER;
         } else {
-            // 0 active (bare category page) or 2 active (missing exactly one): list order already
-            // gives the right answer either way — diffing the full 3-item effective priority list
-            // against zero actives starts at its first entry (origin, or a category's override —
-            // see $priority above), and against two actives always leaves exactly the one
-            // dimension that's missing, regardless of which two those are.
-            $remaining = array_values(array_diff($priority, $active_bases, $skip_bases));
-            if (empty($remaining)) {
-                return null;
+            $active_bases = array_column($active, 'base');
+            $dimensions = array_reverse(array_values(array_diff(self::CHIP_DIMENSION_ORDER, $active_bases)));
+        }
+
+        $rows = [];
+        foreach ($dimensions as $base) {
+            $row = self::build_chip_row($base, $active);
+            if ($row !== null) {
+                $rows[] = $row;
             }
-            $next_base = $remaining[0];
         }
+        return $rows;
+    }
 
-        $taxonomy = self::$tax_map[$next_base];
-
-        $active_clauses = [];
-        foreach ($active as $entry) {
-            $active_clauses[] = ['taxonomy' => $entry['taxonomy'], 'field' => 'slug', 'terms' => [$entry['slug']]];
-        }
-        $extra_args = self::build_filter_query_args();
-        if (!empty($extra_args['tax_query'])) {
-            $active_clauses = array_merge($active_clauses, $extra_args['tax_query']);
-        }
+    /**
+     * Builds one chip-row's data (all candidate chips, most-populous first — "Show more" reveals
+     * the ones past self::CHIP_ROW_VISIBLE_CAP client-side, see chip-rows.php) or null when $base
+     * has fewer than 2 viable candidates against $active, per the row-level minimum-2 rule.
+     *
+     * "Viable" is counted against every OTHER active clause (path-based and $_GET-driven, via
+     * build_filter_query_args()) with $base's own taxonomy excluded from that context — see
+     * chip_row_active_clauses(). Excluding $base's own clause is what makes a row for an
+     * already-active dimension (category+attribute chain) still show real, product-backed
+     * alternatives to switch to, rather than just re-confirming the one already selected.
+     */
+    private static function build_chip_row($base, $active)
+    {
+        $taxonomy = self::$tax_map[$base];
+        $active_clauses = self::chip_row_active_clauses($active, $taxonomy);
 
         $terms = get_terms(['taxonomy' => $taxonomy, 'hide_empty' => true]);
         $candidates = [];
@@ -1155,59 +1096,117 @@ class Shop
             }
         }
 
+        // Rule: a row is hidden entirely when fewer than 2 distinct values exist for it.
         if (count($candidates) < 2) {
-            return self::get_next_filter_suggestion($active, array_merge($skip_bases, [$next_base]));
+            return null;
         }
 
         usort($candidates, function ($a, $b) {
             return $b['count'] <=> $a['count'];
         });
-        $candidates = array_slice($candidates, 0, self::NEXT_FILTER_CHIP_CAP);
-
-        // Insert $next_base at its self::CHAIN_DIMENSION_ORDER position rather than always at the
-        // end — $active is already in fixed order (it's sourced from an already-canonical page,
-        // or the client's own already-canonical page URL for the "Skip" AJAX case), so splitting
-        // it around $next_base's position and stitching the two halves back together with
-        // $next_base in between is enough to keep every generated chip URL in fixed order too.
-        $dimension_order = array_flip(self::CHAIN_DIMENSION_ORDER);
-        $next_order = $dimension_order[$next_base] ?? PHP_INT_MAX;
-        $prefix_parts = [];
-        $suffix_parts = [];
-        foreach ($active as $entry) {
-            if (($dimension_order[$entry['base']] ?? PHP_INT_MAX) < $next_order) {
-                $prefix_parts[] = $entry['base'];
-                $prefix_parts[] = $entry['slug'];
-            } else {
-                $suffix_parts[] = $entry['base'];
-                $suffix_parts[] = $entry['slug'];
-            }
-        }
+        $candidates = array_slice($candidates, 0, self::CHIP_ROW_FETCH_CAP);
 
         $chips = [];
         foreach ($candidates as $c) {
-            $url_parts = array_merge($prefix_parts, [$next_base, $c['term']->slug], $suffix_parts);
-            $chip = [
-                'name'  => $c['term']->name,
-                'count' => $c['count'],
-                'url'   => home_url('/' . implode('/', $url_parts) . '/'),
-            ];
-
-            if ($next_base === 'color') {
-                $chip['swatch'] = self::color_swatch_for_term($c['term']);
-            } elseif ($next_base === 'shape') {
-                $chip['shape_slug'] = $c['term']->slug;
-            } elseif ($next_base === 'origin') {
-                $chip['thumbnail_url'] = self::origin_chip_thumbnail_url($c['term']);
-            }
-
-            $chips[] = $chip;
+            $chips[] = self::build_chip($base, $c, $active);
         }
 
         return [
-            'base'  => $next_base,
-            'label' => wc_attribute_label('pa_' . $next_base),
-            'chips' => $chips,
+            'base'    => $base,
+            'label'   => wc_attribute_label($taxonomy),
+            'chips'   => $chips,
+            'visible' => self::CHIP_ROW_VISIBLE_CAP,
         ];
+    }
+
+    /**
+     * The tax_query context a chip row's own candidate terms are counted against: every currently
+     * active clause (path-based $active entries, plus $_GET-driven filters via
+     * build_filter_query_args() — same single source of truth used everywhere else) EXCEPT any
+     * clause on $row_taxonomy itself. Excluding the row's own dimension is what lets an
+     * already-active dimension's row (category+attribute chain) still surface alternative terms
+     * instead of only ever re-confirming the one already selected.
+     */
+    private static function chip_row_active_clauses($active, $row_taxonomy)
+    {
+        $clauses = [];
+        foreach ($active as $entry) {
+            if ($entry['taxonomy'] === $row_taxonomy) {
+                continue;
+            }
+            $clauses[] = ['taxonomy' => $entry['taxonomy'], 'field' => 'slug', 'terms' => [$entry['slug']]];
+        }
+
+        $extra_args = self::build_filter_query_args();
+        if (!empty($extra_args['tax_query'])) {
+            foreach ($extra_args['tax_query'] as $clause) {
+                if (($clause['taxonomy'] ?? '') !== $row_taxonomy) {
+                    $clauses[] = $clause;
+                }
+            }
+        }
+
+        return $clauses;
+    }
+
+    /**
+     * One candidate term's chip: name/count/URL plus the per-dimension visual (color swatch, shape
+     * icon, or origin thumbnail) — same three cases as the old single-suggestion chip builder.
+     */
+    private static function build_chip($base, $candidate, $active)
+    {
+        $term = $candidate['term'];
+        $chip = [
+            'name'  => $term->name,
+            'count' => $candidate['count'],
+            'url'   => self::build_chip_url($base, $term->slug, $active),
+        ];
+
+        if ($base === 'color') {
+            $chip['swatch'] = self::color_swatch_for_term($term);
+        } elseif ($base === 'shape') {
+            $chip['shape_slug'] = $term->slug;
+        } elseif ($base === 'origin') {
+            $chip['thumbnail_url'] = self::origin_chip_thumbnail_url($term);
+        }
+
+        return $chip;
+    }
+
+    /**
+     * The chained URL for picking $slug on dimension $base, given the page's current $active
+     * chain. Any existing $active entry for $base itself is replaced (not duplicated) — needed
+     * for a chip row on an already-active dimension (category+attribute chain) to actually let the
+     * visitor switch terms rather than appending a second, conflicting segment. Every other active
+     * entry is kept, and $base is inserted at its fixed self::CHAIN_DIMENSION_ORDER position so
+     * the result always matches the one canonical URL for that filter combination (same fixed
+     * order parse_attribute_chain()/redirect_to_ordered_chain() enforce).
+     */
+    private static function build_chip_url($base, $slug, $active)
+    {
+        $dimension_order = array_flip(self::CHAIN_DIMENSION_ORDER);
+        $target_order = $dimension_order[$base] ?? PHP_INT_MAX;
+
+        $parts = [];
+        $inserted = false;
+        foreach ($active as $entry) {
+            if ($entry['base'] === $base) {
+                continue;
+            }
+            if (!$inserted && ($dimension_order[$entry['base']] ?? PHP_INT_MAX) > $target_order) {
+                $parts[] = $base;
+                $parts[] = $slug;
+                $inserted = true;
+            }
+            $parts[] = $entry['base'];
+            $parts[] = $entry['slug'];
+        }
+        if (!$inserted) {
+            $parts[] = $base;
+            $parts[] = $slug;
+        }
+
+        return home_url('/' . implode('/', $parts) . '/');
     }
 
     /**
@@ -1379,52 +1378,6 @@ class Shop
         return '<svg width="20" height="20" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'
             . $icons[$base]
             . '</svg>';
-    }
-
-    /**
-     * AJAX handler for the "Skip" link — returns the next remaining dimension's chip row (or an
-     * empty one if none left, so the client hides the whole block) without changing the page URL.
-     *
-     * This is a plain admin-ajax.php-style request with no page context of its own (same reason
-     * ajax_load_more_products() needs its own archive_pa_filters param) — the page's active path
-     * chain is reconstructed here from the `active` JSON param the client sends (the same one the
-     * initial render exposed via the chip row's own data-active attribute), not from
-     * self::get_active_path_bases()/self::$chain_terms, which only ever reflect a real page load.
-     */
-    public function ajax_next_filter_suggestion()
-    {
-        $skip_raw   = sanitize_text_field($_GET['skip'] ?? '');
-        $skip_bases = array_values(array_filter(array_map('sanitize_key', explode(',', $skip_raw))));
-
-        $active_raw = json_decode(stripslashes((string) ($_GET['active'] ?? '')), true);
-        $active = [];
-        if (is_array($active_raw)) {
-            foreach ($active_raw as $entry) {
-                $base = sanitize_key($entry['base'] ?? '');
-                $slug = sanitize_title($entry['slug'] ?? '');
-                if ($base === '' || $slug === '') {
-                    continue;
-                }
-                // 'product-category' isn't a self::$tax_map key (it's product_cat, not a pa_*
-                // attribute) — same special-case as get_active_path_bases()/get_next_filter_suggestion().
-                $taxonomy = ($base === 'product-category') ? 'product_cat' : (self::$tax_map[$base] ?? null);
-                if (!$taxonomy || !get_term_by('slug', $slug, $taxonomy)) {
-                    continue;
-                }
-                $active[] = ['base' => $base, 'taxonomy' => $taxonomy, 'slug' => $slug];
-            }
-        }
-
-        $suggestion = self::get_next_filter_suggestion($active, $skip_bases);
-
-        ob_start();
-        get_template_part_var('templates/shop/next-filter-chips.php', ['suggestion' => $suggestion, 'skipped' => $skip_bases, 'active' => $active]);
-        $html = ob_get_clean();
-
-        wp_send_json_success([
-            'html' => $html,
-            'base' => $suggestion['base'] ?? null,
-        ]);
     }
 
     public static function add_query_vars($vars)
@@ -2168,7 +2121,7 @@ class Shop
     /**
      * Real product IDs matching an AND of every entry's taxonomy+slug (1 entry = a single-
      * dimension page, 2+ = a chain) — same direct, non-main `WP_Query(['post_type' => 'product',
-     * 'fields' => 'ids', ...])` pattern self::get_next_filter_suggestion() already uses for this
+     * 'fields' => 'ids', ...])` pattern self::build_chip_row() already uses for this
      * exact kind of ad-hoc product-set lookup, not the actual page's own $wp_query (which this
      * needs to call for *other*, non-rendered candidate URLs too, not just the current page).
      * Sorted so two calls' results can be compared with a plain `===` for exact-set equality —
