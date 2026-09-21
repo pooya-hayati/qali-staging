@@ -747,6 +747,19 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
   transform: translateY(57.2%);
 }
 
+/* .section-hero's own divider graphic is deliberately positioned to spill over
+   (translateY 57.2%) into whichever section follows it as a decorative seam.
+   That spill is 57.2% of the divider's own height, and the divider is 100vw
+   wide at a fixed 1440:383 aspect ratio, so the overlap scales with viewport
+   width too (~15.2vw at any width) -- a flat 100px (fine for a plain
+   .section-covered section) isn't enough to clear it. Whatever section
+   follows section-hero needs this scaling clearance instead, regardless of
+   the generic ".section:not(.section-covered)+.section" zero-padding rule
+   above, so the divider never overlaps that section's own heading. */
+.section-hero+.section .section-wrapper {
+  padding-top: max(120px, 16vw + 20px) !important;
+}
+
 .section-intro {
   overflow: clip;
 }
