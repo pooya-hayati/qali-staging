@@ -10,6 +10,12 @@
  * "Show more" is a pure client-side reveal (shop.js) — every chip past a row's visible cap is
  * already in the markup, just `hidden`, so no AJAX round-trip is needed to expand it (unlike the
  * old single-suggestion "Skip" system this replaced).
+ *
+ * Mobile-only "Narrow your search" toggle (shop.js/main.css, desktop unaffected — see
+ * .page-header-chip-rows-toggle's own CSS): collapses all 3 rows behind one control, collapsed by
+ * default. The rows themselves stay in the initial HTML either way, just visually hidden via CSS
+ * (max-height/opacity, not `hidden`/lazy-injection) until toggled, so every chip link — including
+ * ones past the "Show more" cap — is already crawlable on first load regardless of JS.
  */
 
 defined('ABSPATH') || exit;
@@ -20,7 +26,12 @@ if (empty($rows)) {
 	return;
 }
 ?>
-<div class="page-header-chip-rows">
+<div class="page-header-chip-rows-wrap" id="page-header-chip-rows-wrap">
+	<button type="button" class="page-header-chip-rows-toggle" aria-expanded="false" aria-controls="page-header-chip-rows">
+		<?= esc_html__('Narrow your search', LANG_STRING) ?>
+		<span class="page-header-chip-rows-toggle-icon" aria-hidden="true">&#9662;</span>
+	</button>
+	<div class="page-header-chip-rows" id="page-header-chip-rows">
 	<?php foreach ($rows as $row) :
 		$visible = max(1, (int) ($row['visible'] ?? 5));
 		$chips   = $row['chips'];
@@ -28,10 +39,8 @@ if (empty($rows)) {
 		$more_count = $total - $visible;
 	?>
 		<div class="page-header-chip-row" data-base="<?= esc_attr($row['base']) ?>">
-			<div class="page-header-chip-row-header">
-				<span class="page-header-chip-row-label"><?= esc_html($row['label']) ?></span>
-			</div>
 			<div class="page-header-chip-row-chips">
+				<span class="page-header-chip-row-label"><?= esc_html(sprintf(__('Narrow by %s', LANG_STRING), $row['label'])) ?></span>
 				<?php foreach ($chips as $i => $chip) :
 					$is_extra = $i >= $visible;
 				?>
@@ -60,4 +69,5 @@ if (empty($rows)) {
 			</div>
 		</div>
 	<?php endforeach; ?>
+	</div>
 </div>

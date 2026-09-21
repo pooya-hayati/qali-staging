@@ -494,3 +494,18 @@ $(function () {
     $btn.text(expanded ? $btn.data('label-more') : $btn.data('label-less'));
   });
 });
+
+// Mobile-only "Narrow your search" toggle for the chip rows above — purely a visibility toggle
+// (CSS handles the actual collapse via .page-header-chip-rows-wrap.is-expanded, see main.css),
+// the rows and every chip link inside them are already in the DOM on page load either way.
+$(function () {
+  $(document).on('click', '.page-header-chip-rows-toggle', function (e) {
+    e.preventDefault();
+    const $btn = $(this);
+    const $wrap = $btn.closest('.page-header-chip-rows-wrap');
+    const expanded = $wrap.hasClass('is-expanded');
+
+    $wrap.toggleClass('is-expanded', !expanded);
+    $btn.attr('aria-expanded', expanded ? 'false' : 'true');
+  });
+});

@@ -2190,29 +2190,39 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
    up to 3 rows: Origin, Color, Shape). Pill shape and hover color reuse .page-header-filter-active
    .filter-tag's / .show-more-btn's own established language (40px pill radius, #780000 ->
    #ac1f1f on hover) rather than new values. */
-.page-header-chip-rows {
+.page-header-chip-rows-wrap {
   margin-top: 24px;
+}
+
+.page-header-chip-rows {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-.page-header-chip-row-header {
-  margin-bottom: 12px;
+/* Mobile-only "Narrow your search" toggle (see the max-width:767.98px block below) — hidden on
+   desktop, where the rows stay always-visible exactly as before. Kept in the DOM at every width
+   rather than PHP-gated so no server-side UA sniffing is needed; CSS alone decides visibility. */
+.page-header-chip-rows-toggle {
+  display: none;
 }
 
+/* Label now sits inline as the row's own first chip-row item (not a separate line above it) —
+   flex-shrink:0/white-space:nowrap so it never wraps or gets squeezed by the chips beside it. */
 .page-header-chip-row-label {
+  flex-shrink: 0;
+  white-space: nowrap;
   font-size: 14px;
   font-weight: 500;
   line-height: normal;
   letter-spacing: 0px;
   color: var(--color-Neutral-700);
-  text-transform: uppercase;
 }
 
 .page-header-chip-row-chips {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 10px;
 }
 
@@ -2323,6 +2333,67 @@ body:not(.nav-opened) #header.sticky .user-nav>li>button {
   background-color: #780000;
   border-color: #780000;
   color: var(--color-White);
+}
+
+/* Mobile: all 3 chip rows collapse behind one "Narrow your search" toggle, collapsed by default.
+   The rows stay in the initial HTML regardless (chip-rows.php never gates them on viewport) — this
+   only ever hides them visually, via max-height/opacity rather than `display:none`/`[hidden]`, so
+   `[hidden]`'s own override two rules up is untouched and every chip link (including ones already
+   past the "Show more" cap) stays crawlable on first load. Desktop is completely unaffected: the
+   toggle stays `display:none` there (rule above) and .page-header-chip-rows keeps its default,
+   always-expanded flex layout. */
+@media (max-width: 767.98px) {
+  .page-header-chip-rows-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--color-Neutral-700);
+    cursor: pointer;
+  }
+
+  .page-header-chip-rows-toggle-icon {
+    font-size: 11px;
+    transition: transform .2s ease;
+  }
+
+  .page-header-chip-rows-wrap.is-expanded .page-header-chip-rows-toggle-icon {
+    transform: rotate(180deg);
+  }
+
+  .page-header-chip-rows {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: max-height .3s ease, opacity .2s ease;
+  }
+
+  .page-header-chip-rows-wrap.is-expanded .page-header-chip-rows {
+    /* Generous enough for 3 rows' worth of single-line content — real height is always smaller
+       than this once each row no longer wraps (see the nowrap/overflow-x rule below), so this
+       cap never visibly clips anything, it's just what lets the CSS transition animate at all. */
+    max-height: 600px;
+    opacity: 1;
+    margin-top: 16px;
+  }
+
+  /* Each row becomes one horizontally-scrollable line instead of wrapping — label and chips
+     alike never shrink or wrap, so the row stays exactly one line tall and compact regardless of
+     how many chips it holds (including ones already past the "Show more" cap, once revealed). */
+  .page-header-chip-row-chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+  }
+
+  .page-header-chip-row-chips .next-filter-chip {
+    flex-shrink: 0;
+  }
 }
 
 .range-slider {
